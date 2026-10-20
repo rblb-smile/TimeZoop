@@ -15,6 +15,7 @@ from .timeline import Entry, fmt_time
 
 APP_DIR = Path(os.environ.get("APPDATA", Path.home())) / "TimeZoop"
 SETTINGS_PATH = APP_DIR / "settings.json"
+INDEX_PATH = APP_DIR / "timelines.json"  # VOD 번호 → 파일 이름 (사용자가 파일 이름에서 번호를 지워도 찾게)
 DEFAULT_SAVE_DIR = Path.home() / "Documents" / "타임줍"
 
 # 예전 이름으로 만든 폴더 (timelineAI → 하이라인 → TimeJup → TimeZoop)
@@ -121,21 +122,107 @@ def from_text(text: str) -> list[Entry]:
     return entries
 
 
-def _safe(name: str) -> str:
-    return re.sub(r'[\\/:*?"<>|\r\n\t]+', " ", name).strip()[:60] or "제목없음"
+def _safe(name: str, limit: int = 60) -> str:
+    name = re.sub(r'[\\/:*?"<>|\r\n\t\[\]]+', " ", name)  # 파일 이름에 못 쓰는 글자, 번호 표시용 [ ]
+    return re.sub(r"\s+", " ", name).strip()[:limit] or "제목없음"
 
 
-def timeline_path(title_no: int, title: str = "") -> Path:
+_NO_NEW = re.compile(r"\[(\d+)\]$")  # 2026-10-20_스트리머_제목 [123456789]
+_NO_OLD = re.compile(r"^(\d+)_")  # 예전 이름 123456789_제목
+_NO_HEAD = re.compile(r"player/(\d+)")  # 파일 첫 줄: # 타임줍 · https://vod.sooplive.com/player/123456789
+
+
+def _no_in_file(path: Path) -> int | None:
+    """파일 첫 줄에 적어 둔 다시보기 주소에서 VOD 번호를 읽는다 (파일 이름을 바꿔도 찾게)."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            m = _NO_HEAD.search(f.readline())
+    except (OSError, UnicodeDecodeError):
+        return None
+    return int(m.group(1)) if m else None
+
+
+def title_no_of(path: Path) -> int | None:
+    """타임라인 파일 이름에서 VOD 번호를 읽는다 (새 이름·예전 이름 모두)."""
+    m = _NO_NEW.search(path.stem) or _NO_OLD.match(path.stem)
+    return int(m.group(1)) if m else None
+
+
+def title_of(path: Path) -> str:
+    """파일 이름에서 제목 부분 (목록 표시용)."""
+    stem = path.stem
+    if _NO_NEW.search(stem):
+        stem = _NO_NEW.sub("", stem).strip()
+        parts = stem.split("_", 2)
+        return parts[2] if len(parts) == 3 else stem
+    return stem.partition("_")[2]
+
+
+def _load_index() -> dict[str, str]:
+    try:
+        return json.loads(INDEX_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _remember(title_no: int, path: Path) -> None:
+    index = _load_index()
+    if index.get(str(title_no)) == path.name:
+        return
+    index[str(title_no)] = path.name
+    try:
+        APP_DIR.mkdir(parents=True, exist_ok=True)
+        INDEX_PATH.write_text(json.dumps(index, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError:
+        pass  # 목록은 보조 수단이라 못 써도 저장 자체는 된다
+
+
+def timeline_files() -> dict[int, Path]:
+    """저장 폴더의 타임라인 파일 {VOD 번호: 경로}. 같은 번호가 여러 개면 최근 것.
+    파일 이름의 [번호]로 찾고, 이름에서 번호가 지워진 파일은 저장할 때 적어 둔 목록으로 찾는다."""
     d = save_dir()
-    existing = sorted(d.glob(f"{title_no}_*.txt"))
-    return existing[0] if existing else d / f"{title_no}_{_safe(title)}.txt"
+    out: dict[int, Path] = {}
+    for p in sorted(d.glob("*.txt"), key=lambda p: p.stat().st_mtime):
+        no = title_no_of(p)
+        if no:
+            out[no] = p
+    for no, name in _load_index().items():
+        if no.isdigit() and int(no) not in out and (d / name).is_file():
+            out[int(no)] = d / name
+    known = set(out.values())
+    for p in d.glob("*.txt"):  # 이름에서 번호가 지워졌고 목록과도 다르면 내용 첫 줄로
+        if p not in known and (no := _no_in_file(p)) and no not in out:
+            out[no] = p
+    return out
 
 
-def save_timeline(title_no: int, title: str, entries: list[Entry]) -> Path:
-    path = timeline_path(title_no, title)
+def timeline_name(title_no: int, title: str, nick: str = "", date: str = "") -> str:
+    parts = [x for x in (date, _safe(nick, 20) if nick else "", _safe(title)) if x]
+    return f"{'_'.join(parts)} [{title_no}].txt"
+
+
+def timeline_path(title_no: int, title: str = "", nick: str = "", date: str = "") -> Path:
+    """이 VOD의 타임라인 파일 경로. 예전 이름으로 저장된 파일이 있으면 새 이름으로 바꾼다."""
+    d = save_dir()
+    want = d / timeline_name(title_no, title, nick, date)
+    old = timeline_files().get(title_no)
+    if old and old != want:
+        if not (date or nick):  # 이름을 정할 정보가 없으면 있던 파일을 그대로 쓴다
+            return old
+        try:
+            old.rename(want)
+        except OSError:
+            return old
+    return want
+
+
+def save_timeline(title_no: int, title: str, entries: list[Entry], nick: str = "", date: str = "") -> Path:
+    path = timeline_path(title_no, title, nick, date)
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(to_text(entries) + "\n", encoding="utf-8")
+    head = f"# 타임줍 · https://vod.sooplive.com/player/{title_no}\n"  # 이 줄은 타임라인으로 읽지 않는다
+    tmp.write_text(head + to_text(entries) + "\n", encoding="utf-8")
     tmp.replace(path)  # 저장 도중 꺼져도 기존 파일이 깨지지 않게
+    _remember(title_no, path)
     return path
 
 
@@ -144,16 +231,14 @@ def recent_timelines(limit: int = 8) -> list[dict]:
     import time
 
     items = []
-    for p in save_dir().glob("*_*.txt"):
-        no, _, title = p.stem.partition("_")
-        if not no.isdigit():
-            continue
+    for no, p in timeline_files().items():
+        title = title_of(p)
         try:
             text = p.read_text(encoding="utf-8")
         except OSError:
             continue
         items.append({
-            "title_no": int(no), "title": title, "path": str(p), "lines": len(from_text(text)),
+            "title_no": no, "title": title, "path": str(p), "lines": len(from_text(text)),
             "mtime": p.stat().st_mtime,
             "modified": time.strftime("%m월 %d일 %H:%M", time.localtime(p.stat().st_mtime)),
         })
@@ -162,7 +247,7 @@ def recent_timelines(limit: int = 8) -> list[dict]:
 
 
 def load_timeline(title_no: int) -> tuple[Path, list[Entry]] | None:
-    existing = sorted(save_dir().glob(f"{title_no}_*.txt"))
-    if not existing:
+    path = timeline_files().get(int(title_no))
+    if not path:
         return None
-    return existing[0], from_text(existing[0].read_text(encoding="utf-8"))
+    return path, from_text(path.read_text(encoding="utf-8"))

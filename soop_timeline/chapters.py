@@ -21,6 +21,20 @@ from .timeline import Entry, fmt_time
 
 BLOCK = 300.0
 
+# 타임라인 개수: 사용자가 분석 전에 고른다. 개수 상한은 두지 않고, 장면을 합치는 기준과 채팅 반응 기준만 바꾼다
+#   min_len: 이보다 짧고 채팅도 평소 수준인 장면은 앞 장면에 합친다(초), busy: 짧아도 남기는 채팅 밀도(평소 대비 배수)
+#   z: 채팅이 터진 순간으로 볼 반응 기준, hl_gap: 그런 순간 사이 최소 간격(초), merge_gap: 장면 시작과 겹쳐 뺄 범위(초)
+DENSITY = {
+    "many": {"min_len": 600.0, "busy": 1.3, "z": 1.8, "hl_gap": 150.0, "merge_gap": 75.0},
+    "normal": {"min_len": 900.0, "busy": 1.6, "z": 2.0, "hl_gap": 180.0, "merge_gap": 90.0},
+    "few": {"min_len": 1500.0, "busy": 2.0, "z": 2.4, "hl_gap": 240.0, "merge_gap": 120.0},
+}
+DEFAULT_DENSITY = "normal"
+
+
+def density(name: str | None) -> dict:
+    return DENSITY.get(name or DEFAULT_DENSITY, DENSITY[DEFAULT_DENSITY])
+
 SYSTEM = (
     "너는 인터넷 방송 다시보기의 타임라인을 정리하는 편집자다. "
     "대본은 음성 인식 결과라 오타와 잘못 들은 단어가 섞여 있으니 앞뒤 맥락으로 판단한다. "
@@ -143,9 +157,11 @@ def _merge_quiet(starts: list[int], blocks: list[Block], min_len: float = 600.0,
     return kept
 
 
-def group_chapters(llm: LocalLLM, vod: VodInfo, blocks: list[Block], split_step=None, title_step=None) -> list[Chapter]:
-    # 개수 상한은 두지 않는다: 주제가 바뀐 곳은 다 나누되, 짧고 조용한 장면만 앞에 합친다
-    starts = _merge_quiet(_split_points(llm, blocks, split_step), blocks)
+def group_chapters(llm: LocalLLM, vod: VodInfo, blocks: list[Block], split_step=None, title_step=None,
+                   dens: dict | None = None) -> list[Chapter]:
+    # 개수 상한은 두지 않는다: 주제가 바뀐 곳은 다 나누되, 짧고 조용한 장면만 앞에 합친다 (기준은 타임라인 개수에 따라)
+    d = dens or density(None)
+    starts = _merge_quiet(_split_points(llm, blocks, split_step), blocks, d["min_len"], d["busy"])
     chapters: list[Chapter] = []
     for n, (s, e) in enumerate(zip(starts, starts[1:] + [len(blocks)]), 1):
         part = blocks[s:e]
@@ -228,6 +244,38 @@ def merge_entries(chapters: list[Entry], highlights: list[Entry], gap: float = 7
     return sorted(chapters + kept, key=lambda e: e.t)
 
 
+def _fill_to_min(llm: LocalLLM, vod: VodInfo, segments: list[Segment], events: list[ChatEvent],
+                 entries: list[Entry], need: int, d: dict, step=None) -> list[Entry]:
+    """최소 개수보다 적으면, 채팅 반응 기준을 낮춰 더 찾은 순간 중 반응이 큰 것부터 제목을 붙여 채운다."""
+    from .highlights import find_highlights
+
+    taken = [e.t for e in entries]
+    cands = [h for h in find_highlights(events, vod.duration, z_threshold=0.8, min_gap=d["hl_gap"] / 2)
+             if h.kind != "balloon" and all(abs(h.t - t) > d["merge_gap"] for t in taken)]
+    cands.sort(key=lambda h: -h.score)
+    added: list[Entry] = []
+    for h in cands[: (need - len(entries)) * 2]:  # 제목을 못 붙이는 순간도 있어 넉넉히
+        if len(entries) + len(added) >= need:
+            break
+        if any(abs(h.t - a.t) <= d["merge_gap"] for a in added):
+            continue
+        added += title_highlights(llm, segments, [h])
+        if step:
+            step(len(entries) + len(added), need)
+    return sorted(entries + added, key=lambda e: e.t)
+
+
+def _trim_to_max(vod: VodInfo, events: list[ChatEvent], entries: list[Entry], keep: int) -> list[Entry]:
+    """최대 개수보다 많으면, 채팅 반응(별점줍과 같은 계산)이 약한 줄부터 뺀다. 첫 줄은 항상 남긴다."""
+    from .signature import scores
+
+    times = [e.t for e in entries]
+    sc = scores(times, events, vod.duration)
+    first = min(range(len(entries)), key=lambda i: entries[i].t)
+    rest = sorted((i for i in range(len(entries)) if i != first), key=lambda i: -sc[i])[: max(keep - 1, 0)]
+    return sorted([entries[first]] + [entries[i] for i in rest], key=lambda e: e.t)
+
+
 def make_timeline(
     vod: VodInfo,
     segments: list[Segment],
@@ -236,8 +284,12 @@ def make_timeline(
     cache_dir: Path,
     model: str | None = None,
     progress=None,
+    dens: dict | None = None,
+    min_count: int | None = None,
+    max_count: int | None = None,
 ) -> list[Entry]:
-    """progress(메시지, 0~1)로 4단계 안의 세부 작업 진행률을 알린다."""
+    """progress(메시지, 0~1)로 4단계 안의 세부 작업 진행률을 알린다.
+    min_count / max_count: 사용자가 정한 줄 수 범위 (없으면 개수 설정대로)."""
     def phase(name: str, lo: float, hi: float):
         def step(done: int, total: int):
             if progress:
@@ -250,9 +302,13 @@ def make_timeline(
         progress("정리 AI를 불러오고 있어요", 0.0)
     with LocalLLM(**kwargs) as llm:
         summarize_blocks(llm, vod, blocks, phase("5분 구간마다 무슨 일이 있었는지 요약하고 있어요", 0.0, 0.40))
-        chapters = group_chapters(llm, vod, blocks, phase("장면이 바뀌는 지점을 찾고 있어요", 0.40, 0.75), phase("장면마다 제목을 붙이고 있어요", 0.75, 0.85))
+        chapters = group_chapters(llm, vod, blocks, phase("장면이 바뀌는 지점을 찾고 있어요", 0.40, 0.75), phase("장면마다 제목을 붙이고 있어요", 0.75, 0.85), dens)
         refine_starts(llm, blocks, chapters, phase("장면 시작 시각을 초 단위로 맞추고 있어요", 0.85, 0.93))
         hl_entries = title_highlights(llm, segments, highlights, phase("채팅이 터진 순간에 제목을 붙이고 있어요", 0.93, 1.0))
+        d = dens or density(None)
+        entries = merge_entries([Entry(c.t, c.title, "chapter") for c in chapters], hl_entries, d["merge_gap"])
+        if min_count and len(entries) < min_count:
+            entries = _fill_to_min(llm, vod, segments, events, entries, min_count, d, phase("모자란 줄을 채우고 있어요", 0.97, 1.0))
 
     tag = (model or "default").removesuffix(".gguf")
     (cache_dir / f"blocks_{tag}.json").write_text(
@@ -260,7 +316,8 @@ def make_timeline(
                    ensure_ascii=False, indent=1),
         encoding="utf-8",
     )
-    entries = merge_entries([Entry(c.t, c.title, "chapter") for c in chapters], hl_entries)
+    if max_count and len(entries) > max_count:
+        entries = _trim_to_max(vod, events, entries, max_count)
     (cache_dir / f"timeline_{tag}.json").write_text(
         json.dumps([asdict(e) for e in entries], ensure_ascii=False, indent=1), encoding="utf-8"
     )

@@ -31,12 +31,7 @@ def _cache_dirs() -> dict[int, Path]:
 
 
 def _timeline_files() -> dict[int, Path]:
-    files: dict[int, Path] = {}
-    for p in settings.save_dir().glob("*_*.txt"):
-        no = p.stem.partition("_")[0]
-        if no.isdigit():
-            files.setdefault(int(no), p)
-    return files
+    return settings.timeline_files()
 
 
 def list_works() -> dict:
@@ -45,7 +40,7 @@ def list_works() -> dict:
     items = []
     for no in set(caches) | set(timelines):
         cache, tl = caches.get(no), timelines.get(no)
-        title = tl.stem.partition("_")[2] if tl else ""
+        title = settings.title_of(tl) if tl else ""
         if cache and (cache / "meta.json").exists():  # 파일 이름은 특수문자가 빠져 있으니 원래 제목을 쓴다
             try:
                 title = json.loads((cache / "meta.json").read_text(encoding="utf-8"))["title"]

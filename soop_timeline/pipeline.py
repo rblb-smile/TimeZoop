@@ -11,6 +11,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from . import control, settings
+from .chapters import density
 from .highlights import find_highlights
 from .paths import DATA_ROOT  # 개발 중엔 프로젝트/data, exe에선 %LOCALAPPDATA%/TimeZoop/data
 from .soop_api import VodInfo, download_audio, load_or_fetch
@@ -22,8 +23,10 @@ def _noop(stage, message, ratio=None):
     pass
 
 
-def run(link: str, *, chat_only: bool = False, model: str | None = None, progress=_noop, cookies: dict | None = None):
-    """cookies: 연령·구독 제한 다시보기일 때만 넘기는 SOOP 로그인 쿠키."""
+def run(link: str, *, chat_only: bool = False, model: str | None = None, progress=_noop, cookies: dict | None = None,
+        amount: str | None = None, min_count: int | None = None, max_count: int | None = None):
+    """cookies: 연령·구독 제한 다시보기일 때만 넘기는 SOOP 로그인 쿠키. amount: 타임라인 개수 (many / normal / few).
+    min_count / max_count: 사용자가 정한 줄 수 범위 (선택)."""
     control.lower_priority()
     report = progress
 
@@ -50,7 +53,8 @@ def run(link: str, *, chat_only: bool = False, model: str | None = None, progres
         )
 
     progress("chat", "채팅이 몰린 순간과 큰 후원을 찾고 있어요", None)
-    hl = find_highlights(events, vod.duration)
+    dens = density(amount)
+    hl = find_highlights(events, vod.duration, z_threshold=dens["z"], min_gap=dens["hl_gap"])
     (cache / "highlights.json").write_text(
         json.dumps([asdict(h) for h in hl], ensure_ascii=False, indent=2), encoding="utf-8"
     )
@@ -80,6 +84,7 @@ def run(link: str, *, chat_only: bool = False, model: str | None = None, progres
     entries = make_timeline(
         vod, segments, events, hl, cache, model,
         lambda message, ratio: progress("llm", message, ratio),
+        dens, min_count, max_count,
     )
     settings.learn_eta("llm", control.clock() - t_llm, vod.duration)
     progress("done", "완료", 1.0)

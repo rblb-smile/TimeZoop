@@ -118,36 +118,55 @@ def levels(times: list[float], events: list[ChatEvent], duration: float, sc: lis
 # ---------- 댓글 만들기 ----------
 
 # 별점줍 줄 맞춤: SOOP 댓글은 웹 페이지라 일반 공백 여러 개를 1칸으로 줄인다.
-# 그래서 줄어들지 않는 전각 공백(1칸)과 반각 공백(반 칸)으로 채워 별점을 같은 세로줄에 놓는다.
-FULL_SPACE, HALF_SPACE = "\u3000", "\u2002"
-MIN_GAP = 1.5  # 가장 긴 제목 뒤에도 남길 간격 (칸)
-MAX_TITLE = 24.0  # 이보다 긴 제목은 맞추지 않고 바로 뒤에 붙인다 (좁은 댓글 칸에서 별점이 다음 줄로 넘어가지 않게)
+# 그래서 줄어들지 않는 공백(전각·반각·얇은 공백)으로 채워 별점을 같은 세로줄에 놓는다.
+# 너비는 SOOP 댓글 글꼴(Pretendard)로 그린 페이지에서 잰 값 (글자 크기 1 기준, 전각 공백 = 한글 한 글자)
+SPACES = (("\u3000", 0.864), ("\u2002", 0.500), ("\u2009", 0.124))
+W_HANGUL, W_SPACE, W_EMOJI = 0.864, 0.251, 1.373
+W_PUNCT = {"·": 0.254, ".": 0.254, ",": 0.258, "!": 0.257, "?": 0.479, "(": 0.341, ")": 0.341,
+           "[": 0.341, "]": 0.341, "-": 0.433, "~": 0.627, ":": 0.254, "/": 0.334, "&": 0.609,
+           "+": 0.627, "%": 0.862, "#": 0.600, "'": 0.201, '"': 0.379}
+W_ASCII = dict(zip("0123456789", (0.596, 0.438, 0.587, 0.617, 0.624, 0.597, 0.613, 0.552, 0.606, 0.613)))
+W_ASCII.update(zip("ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                   (0.646, 0.619, 0.693, 0.686, 0.567, 0.557, 0.709, 0.706, 0.244, 0.516, 0.621, 0.533, 0.853,
+                    0.718, 0.727, 0.604, 0.727, 0.608, 0.607, 0.611, 0.707, 0.646, 0.915, 0.612, 0.634, 0.595)))
+W_ASCII.update(zip("abcdefghijklmnopqrstuvwxyz",
+                   (0.535, 0.591, 0.529, 0.591, 0.553, 0.337, 0.579, 0.563, 0.218, 0.218, 0.517, 0.218, 0.834,
+                    0.557, 0.567, 0.579, 0.579, 0.350, 0.496, 0.340, 0.553, 0.529, 0.777, 0.513, 0.529, 0.513)))
+MIN_GAP = 1.5  # 가장 긴 제목 뒤에도 남길 간격 (한글 약 1.7자)
+MAX_TITLE = 26.0  # 시각 포함 이보다 긴 줄은 맞추지 않고 바로 뒤에 붙인다 (제목 한글 약 24자, 좁은 댓글 칸 대비)
 
 
 def text_width(text: str) -> float:
-    """비례 글꼴에서 보이는 너비를 한글 1칸 기준으로 어림한다."""
+    """Pretendard에서 보이는 너비 (글자 크기 1 기준) 어림."""
     w = 0.0
     for ch in text:
         o = ord(ch)
         if ch in MARK:
             continue
-        if 0xAC00 <= o <= 0xD7A3 or 0x3130 <= o <= 0x318F or 0x4E00 <= o <= 0x9FFF or o in (0x3000,):
-            w += 1.0  # 한글·한자·전각
+        if 0xAC00 <= o <= 0xD7A3 or 0x3130 <= o <= 0x318F or 0x4E00 <= o <= 0x9FFF:
+            w += W_HANGUL
         elif o >= 0x1F000 or 0x2600 <= o <= 0x27BF:
-            w += 1.2  # 이모지
+            w += W_EMOJI
         elif ch == " ":
-            w += 0.28
-        elif ch.isdigit() or ch.isalpha():
-            w += 0.55 if ch.isupper() or ch.isdigit() else 0.5
+            w += W_SPACE
+        elif ch in W_ASCII:
+            w += W_ASCII[ch]
+        elif ch.isalpha():
+            w += 0.6
         else:
-            w += 0.32  # 문장부호
+            w += W_PUNCT.get(ch, 0.36)
     return w
 
 
 def pad_to(width: float, target: float) -> str:
+    """target 너비까지 줄어들지 않는 공백으로 채운다 (넓은 것부터)."""
     gap = max(target - width, MIN_GAP)
-    full = int(gap)
-    return FULL_SPACE * full + (HALF_SPACE if gap - full >= 0.25 else "")
+    out = []
+    for ch, w in SPACES:
+        n = int((gap + 0.06) // w)
+        out.append(ch * n)
+        gap -= n * w
+    return "".join(out)
 
 
 def header(times: list[float], sc: list[float], o: dict) -> str:
@@ -171,7 +190,7 @@ def compose(vod: VodInfo, body: str, events: list[ChatEvent], limit: int = COMME
     lv = levels(times, events, vod.duration, sc)
     head = header(times, sc, o)
     if o["stars"]:
-        widths = [text_width(e.title) for e in entries]
+        widths = [text_width(f"{fmt_time(e.t)} {e.title}") for e in entries]  # 시각 숫자 너비도 줄마다 다르다
         target = min(max(widths), MAX_TITLE) + MIN_GAP
         lines = [f"{fmt_time(e.t)} {e.title}{MARK}{pad_to(w, target)}{gauge(level, o['style'])}"
                  for e, level, w in zip(entries, lv, widths)]

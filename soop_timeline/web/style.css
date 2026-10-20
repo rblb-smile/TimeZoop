@@ -450,3 +450,24 @@ body.dock-open .tracker { bottom: 92px; }  /* 편집·미리보기 하단 버튼
 }
 
 .field .hint { font-size: 12.5px; color: var(--text-3); align-self: center; }
+
+/* 확인 창: 타임라인 개수 고르기 */
+.amount-row { display: grid; gap: 10px; margin-top: 14px; padding: 12px 14px; border-radius: 12px;
+  background: color-mix(in srgb, var(--pink) 8%, var(--surface-2)); border: 1.5px solid color-mix(in srgb, var(--pink) 70%, transparent);
+  animation: amount-glow 2.4s ease-in-out infinite; }
+@keyframes amount-glow {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pink) 0%, transparent), 0 0 14px -4px color-mix(in srgb, var(--pink) 45%, transparent); }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--pink) 20%, transparent), 0 0 22px -2px color-mix(in srgb, var(--pink) 60%, transparent); }
+}
+.amount-row b { font-size: 14px; font-weight: 800; color: var(--pink); }
+.amount-row .segmented button { font-weight: 700; }
+.amount-row .segmented button.on { background: var(--lime); color: var(--ink, #0d0c18); box-shadow: 0 0 12px -2px color-mix(in srgb, var(--lime) 70%, transparent); }
+.amount-hint { font-size: 12.5px; color: var(--text-2); }
+@media (prefers-reduced-motion: reduce) { .amount-row { animation: none; } }
+.amount-top { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.count-range { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 13px; color: var(--text-2); padding-top: 10px; border-top: 1px dashed var(--border-strong); }
+.count-range .tilde { margin: 0 4px; color: var(--text-3); }
+.count-input { width: 76px; height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font: inherit; font-weight: 700; text-align: center; }
+.count-input:focus { outline: none; border-color: var(--pink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pink) 25%, transparent); }
+.count-input::placeholder { color: var(--text-3); font-weight: 500; }
+.count-note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-3); }

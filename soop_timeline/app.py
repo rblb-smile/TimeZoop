@@ -174,28 +174,47 @@ class Api:
                 "audio": all((pipeline.DATA_ROOT / str(title_no) / f"audio_{f.key}.m4a").exists() for f in vod.files),
                 "stt": (pipeline.DATA_ROOT / str(title_no) / "transcript_large-v3.json").exists(),
             },
+            "amount": settings.load().get("amount") or "normal",
         }
 
-    def analyze(self, link: str) -> dict:
+    def analyze(self, link: str, amount: str | None = None, min_count=None, max_count=None) -> dict:
+        """amount: 타임라인 개수 (many / normal / few). 고른 값은 다음 분석의 기본값으로 저장한다.
+        min_count / max_count: 이번 분석의 줄 수 범위 (선택, 저장하지 않는다)."""
         if self._busy:
             return {"ok": False, "error": "이미 분석 중입니다"}
+        from .chapters import DENSITY
+
+        if amount in DENSITY:
+            data = settings.load()
+            data["amount"] = amount
+            settings.save(data)
         self._busy = True
         self._busy_title_no = parse_vod_id(link)
-        threading.Thread(target=self._analyze, args=(link,), daemon=True).start()
+        def num(v):
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                return None
+            return min(v, 300) if v > 0 else None
+
+        lo, hi = num(min_count), num(max_count)
+        if lo and hi and lo > hi:
+            lo, hi = hi, lo
+        threading.Thread(target=self._analyze, args=(link, settings.load().get("amount"), lo, hi), daemon=True).start()
         return {"ok": True}
 
-    def _analyze(self, link: str) -> None:
+    def _analyze(self, link: str, amount: str | None = None, min_count: int | None = None, max_count: int | None = None) -> None:
         try:
             # 연령·구독 제한 다시보기면 로그인한 계정으로 받는다 (확인 창 단계에서 판단)
             cookies = soop_account.load_cookies() if parse_vod_id(link) in self._needs_login else None
             vod, entries = pipeline.run(
                 link, progress=lambda stage, msg, ratio=None: self._emit("progress", stage=stage, message=msg, ratio=ratio),
-                cookies=cookies,
+                cookies=cookies, amount=amount, min_count=min_count, max_count=max_count,
             )
             # 분석 중에 다른 타임라인을 편집하고 있을 수 있으니 self._vod는 바꾸지 않는다 (화면이 activate로 연다)
             self._vods[vod.title_no] = vod
             self._chat.pop(vod.title_no, None)  # 새로 받은 채팅으로 별점줍을 다시 계산하게
-            path = settings.save_timeline(vod.title_no, vod.title, entries)
+            path = settings.save_timeline(vod.title_no, vod.title, entries, vod.bj_nick, vod.upload_date)
             self._emit("result", vod=self._vod_info(vod), entries=[asdict(e) for e in entries], path=str(path))
         except Exception as e:  # 화면에 원인을 보여 준다
             traceback.print_exc()
@@ -261,7 +280,8 @@ class Api:
         if not self._vod:
             return {"ok": False, "error": "열린 타임라인이 없습니다"}
         items = [Entry(float(e["t"]), str(e["title"]).strip(), e.get("kind", "chapter")) for e in entries if str(e["title"]).strip()]
-        path = settings.save_timeline(self._vod.title_no, self._vod.title, items)
+        v = self._vod
+        path = settings.save_timeline(v.title_no, v.title, items, v.bj_nick, v.upload_date)
         return {"ok": True, "path": str(path), "text": settings.to_text(items)}
 
     def comment_parts(self, text: str) -> list[str]:

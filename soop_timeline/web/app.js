@@ -530,12 +530,37 @@ const app = {
     }
     if (!chk.ok && chk.access === "denied") return this.alert(chk.error, chk.detail);
     if (!chk.ok) return this.alert("링크를 확인해 주세요", chk.error);
-    const choice = await this.modal("이 다시보기가 맞나요?", this.vodCard(chk), chk.saved
+    let amount = chk.amount || "normal";
+    const amounts = [["few", "쪼끔만", "굵직한 장면만"], ["normal", "적당히", "보기 좋은 만큼 (추천)"], ["many", "많이많이", "주제가 바뀐 곳을 촘촘하게"]];
+    const hint = el("span", { className: "amount-hint" });
+    const seg = el("div", { className: "segmented" }, amounts.map(([v, label, desc]) => {
+      const b = el("button", { className: v === amount ? "on" : "", textContent: label });
+      b.onclick = () => { amount = v; seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); hint.textContent = desc; };
+      if (v === amount) hint.textContent = desc;
+      return b;
+    }));
+    // 최소·최대 개수 (선택). 비우면 고른 개수 설정대로
+    const num = (ph) => el("input", { type: "number", min: "1", max: "300", inputMode: "numeric", placeholder: ph, className: "count-input" });
+    const minIn = num("예: 10"), maxIn = num("예: 30");
+    const range = el("div", { className: "count-range" }, [
+      el("span", { textContent: "최소" }), minIn, el("span", { textContent: "개" }),
+      el("span", { className: "tilde", textContent: "~" }),
+      el("span", { textContent: "최대" }), maxIn, el("span", { textContent: "개" }),
+    ]);
+    const rangeNote = el("p", { className: "count-note", textContent: "비워 두면 방송 길이와 채팅 반응을 보고 딱 알맞은 개수로 정리해 드려요. 숫자는 하나만 넣어도 돼요." });
+    const amountRow = el("div", { className: "amount-row" }, [
+      el("div", { className: "amount-top" }, [el("b", { textContent: "타임라인 개수" }), seg, hint]),
+      range, rangeNote,
+    ]);
+    const choice = await this.modal("이 다시보기가 맞나요?", [this.vodCard(chk), amountRow], chk.saved
       ? [["취소", null, "ghost"], ["새로 분석", "new"], ["불러오기", "open", "primary"]]
       : [["취소", null, "ghost"], ["이 VOD로 시작", "new", "primary"]], { wide: true });
     if (!choice) return;
     if (choice === "open") return this.openSaved(String(chk.title_no));
-    const r = await api().analyze(link);
+    const toNum = (i) => { const v = parseInt(i.value, 10); return Number.isFinite(v) && v > 0 ? Math.min(v, 300) : null; };
+    let minN = toNum(minIn), maxN = toNum(maxIn);
+    if (minN && maxN && minN > maxN) [minN, maxN] = [maxN, minN];  // 거꾸로 넣었으면 바로잡는다
+    const r = await api().analyze(link, amount, minN, maxN);
     if (!r.ok) return this.alert("시작하지 못했어요", r.error);
     $("btnAnalyze").disabled = true;
     this.job = { active: true, startedAt: Date.now(), titleNo: chk.title_no, duration: chk.duration, etaModel: chk.eta_model, cached: chk.cached, pct: 0 };

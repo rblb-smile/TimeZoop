@@ -10,7 +10,7 @@ import json
 import re
 import subprocess
 import xml.etree.ElementTree as ET
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 import httpx
@@ -53,6 +53,7 @@ class VodInfo:
     # 시작 전 확인 창에 보여 줄 값
     thumb: str = ""
     write_tm: str = ""  # "2026-10-19 21:20:28 ~ 2026-10-20 02:15:49" (방송 시작 ~ 끝)
+    upload_tm: str = ""  # 다시보기가 올라온 시각 "2026-10-20 02:15:49"
     category: str = ""
     view_cnt: int = 0
 
@@ -66,7 +67,14 @@ class VodInfo:
     @classmethod
     def from_json(cls, d: dict) -> "VodInfo":
         files = [VodFile(**f) for f in d.pop("files")]
-        return cls(**d, files=files)
+        known = {f.name for f in fields(cls)}
+        return cls(**{k: v for k, v in d.items() if k in known}, files=files)  # 예전/새 캐시 모두 읽게
+
+    @property
+    def upload_date(self) -> str:
+        """다시보기가 올라온 날 (YYYY-MM-DD). 예전 캐시에는 없어서 방송이 끝난 시각으로 대신한다."""
+        tm = self.upload_tm or (self.write_tm.split("~")[-1] if self.write_tm else "") or self.broad_start
+        return tm.strip()[:10]
 
 
 @dataclass
@@ -196,6 +204,7 @@ def fetch_vod_info(title_no: int, client: httpx.Client | None = None, cookies: d
         file_type=d.get("file_type") or "REVIEW",
         thumb=d.get("thumb") or "",
         write_tm=d.get("write_tm") or "",
+        upload_tm=d.get("update_tm") or "",
         category=d.get("cate_name") or "",
         view_cnt=int(d.get("view_cnt") or 0),
     )
