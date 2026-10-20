@@ -471,3 +471,11 @@ body.dock-open .tracker { bottom: 92px; }  /* 편집·미리보기 하단 버튼
 .count-input:focus { outline: none; border-color: var(--pink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pink) 25%, transparent); }
 .count-input::placeholder { color: var(--text-3); font-weight: 500; }
 .count-note { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-3); }
+
+/* 진단 정보 안내 */
+.diag-box { margin-top: 10px; padding: 10px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border); }
+.diag-box b { display: block; font-size: 13px; margin-bottom: 4px; }
+.diag-box.in b { color: var(--primary-text); }
+.diag-box.out b { color: var(--pink); }
+.diag-list { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.65; color: var(--text-2); }
+.modal .diag-box + p { margin-top: 12px; }

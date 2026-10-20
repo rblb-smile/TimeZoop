@@ -8,15 +8,15 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import threading
-import traceback
 import webbrowser
 from dataclasses import asdict
 from pathlib import Path
 
 import webview
 
-from . import control, models, pipeline, settings, soop_account, works
+from . import control, diagnostics, models, pipeline, settings, soop_account, works
 from .soop_api import VodInfo, parse_vod_id
 from .timeline import Entry
 
@@ -73,6 +73,19 @@ class Api:
         if self._window:
             self._window.evaluate_js(f"app.onEvent({json.dumps(kind)}, {json.dumps(data, ensure_ascii=False)})")
 
+    def export_diagnostics(self) -> dict:
+        """문제 제보용 진단 zip을 바탕화면에 만들고 탐색기에서 보여 준다."""
+        try:
+            path = diagnostics.export()
+        except Exception as e:
+            diagnostics.log_error("진단 정보 만들기", e)
+            return {"ok": False, "error": f"만들지 못했어요 ({e.__class__.__name__}: {e})"}
+        try:
+            subprocess.Popen(["explorer", "/select,", str(path)])
+        except OSError:
+            pass
+        return {"ok": True, "path": str(path), "name": path.name}
+
     def log(self, message: str) -> None:
         """화면(JavaScript) 쪽 오류를 파일에 남긴다."""
         settings.APP_DIR.mkdir(parents=True, exist_ok=True)
@@ -110,7 +123,7 @@ class Api:
             except models.Cancelled:
                 self._emit("setup_error", message="받기를 멈췄어요. 다시 누르면 받던 곳부터 이어서 받아요.", cancelled=True)
             except Exception as e:
-                traceback.print_exc()
+                diagnostics.log_error("모델 받기", e)
                 self._emit("setup_error", message=f"모델을 받지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요. 받던 곳부터 이어서 받아요. ({e})")
             finally:
                 self._downloading = False
@@ -217,7 +230,7 @@ class Api:
             path = settings.save_timeline(vod.title_no, vod.title, entries, vod.bj_nick, vod.upload_date)
             self._emit("result", vod=self._vod_info(vod), entries=[asdict(e) for e in entries], path=str(path))
         except Exception as e:  # 화면에 원인을 보여 준다
-            traceback.print_exc()
+            diagnostics.log_error("분석", e, vod=parse_vod_id(link), amount=amount, min=min_count, max=max_count)
             from .soop_api import AccessRequired, VodError
 
             if isinstance(e, AccessRequired):
@@ -427,8 +440,8 @@ class Api:
                         if "sooplive" in (morsel["domain"] or "sooplive"):
                             cookies[name] = morsel.value
                 user = soop_account.check_login(cookies)
-            except Exception:
-                traceback.print_exc()
+            except Exception as e:
+                diagnostics.log_error("로그인 확인", e)
                 return
             if user:
                 done["v"] = True
@@ -452,7 +465,11 @@ class Api:
         try:
             user = soop_account.post_comments(self._vod, text)
         except soop_account.UploadError as e:
+            diagnostics.log_error("업로드", e, vod=self._vod.title_no if self._vod else "")
             return {"ok": False, "error": str(e)}
+        except Exception as e:  # 예상 못 한 오류도 화면에 알리고 기록한다
+            diagnostics.log_error("업로드", e, vod=self._vod.title_no if self._vod else "")
+            return {"ok": False, "error": f"{e.__class__.__name__}: {e}"}
         return {"ok": True, **user}
 
 

@@ -5,6 +5,21 @@ const LIMIT = 5000;
 // 댓글 서명(BEST ZOOP 머리말·별점줍·꼬리말·보이지 않는 표식)은 Python(signature.py)이 업로드·복사할 때 붙인다.
 // 화면에서는 머리말·별점줍을 켜고 끄거나 모양만 고를 수 있고(모든 줄에 한 번에), 꼬리말은 항상 들어간다.
 const SIGN_HEAD = 45, SIGN_FOOT = 34, SIGN_STARS = 27, SIGN_MARK = 3;  // 별점줍은 줄 맞춤 공백 포함  // 글자 수 안내용 어림값
+// 진단 정보: 들어가는 것 / 들어가지 않는 것 (README·사용설명서·설치안내와 같은 목록)
+const DIAG_IN = [
+  "타임줍 버전",
+  "PC 사양: Windows 버전, CPU, 메모리, 그래픽카드(이름·VRAM·드라이버), 남은 저장 공간",
+  "AI 모델 상태",
+  "앱 설정: 화면 모드, 효과음, 타임라인 개수, 댓글 꾸미기, 남은 시간 계산값",
+  "오류 기록: 앱 오류, 마지막으로 실패한 작업, 정리 AI 실행 기록, 자가 진단 기록 (실패한 다시보기 번호가 들어갈 수 있어요)",
+];
+const DIAG_OUT = [
+  "SOOP 아이디·비밀번호, 로그인 정보(쿠키)",
+  "업로드 기록, 타임라인·댓글 내용",
+  "방송 음성, 채팅, 받아쓰기 내용",
+  "PC 사용자 이름과 SOOP 계정 이름 (기록에 있으면 <사용자>로 바꿔요)",
+];
+const DIAG_SEND = "만든 파일은 어디로도 자동으로 보내지 않아요. 직접 디스코드에 올릴 때만 전달돼요.";
 const STYLE_NAMES = { bracket: "낫표", angle: "괄호", pang: "팡!", dust: "별가루", star: "별하나", none: "없음" };
 const STYLE_MARKS = { bracket: "「 」", angle: "〈 〉", pang: "-ˏˋ ˎˊ-", dust: "⁺₊ ₊⁺", star: "⋆ ⋆", none: "" };
 const STARS_RE = /^(.*?)(\s+)(\S*\s?[✦✧]{5}.*)$/u;  // 줄 끝의 별점줍 (모양과 상관없이)
@@ -149,10 +164,31 @@ const app = {
     }
   },
   alert(title, msg) { return this.modal(title, msg, [["확인", true, "primary"]]); },
-  // 실패 창: 확인 + 디스코드에 알리기 (누르면 디스코드만 열리고, 내용은 사용자가 직접 적는다)
+  // 실패 창: 확인 + 진단 정보 만들기 + 디스코드에 알리기 (디스코드는 열기만 하고, 내용은 사용자가 직접 올린다)
   async failAlert(title, msg) {
-    const r = await this.modal(title, msg, [["디스코드에 알리기", "discord", "ghost"], ["확인", true, "primary"]]);
+    const body = [].concat(msg, "문제를 알려 주실 때 [진단 정보 만들기]로 만든 파일을 함께 올려 주시면 빨리 고칠 수 있어요.");
+    const r = await this.modal(title, body, [["진단 정보 만들기", "diag", "ghost"], ["디스코드에 알리기", "discord", "ghost"], ["확인", true, "primary"]]);
     if (r === "discord") api().open_feedback();
+    if (r === "diag") this.exportDiagnostics();
+  },
+  async exportDiagnostics() {
+    // 만들기 전에 무엇이 들어가고 무엇이 빠지는지 먼저 보여 준다
+    const list = (items) => el("ul", { className: "diag-list" }, items.map((t) => el("li", { textContent: t })));
+    const ok = await this.modal("진단 정보를 만들까요?", [
+      "문제를 알려 주실 때 올릴 파일(zip)을 바탕화면에 만들어요.",
+      el("div", { className: "diag-box in" }, [el("b", { textContent: "들어가는 것" }), list(DIAG_IN)]),
+      el("div", { className: "diag-box out" }, [el("b", { textContent: "들어가지 않는 것" }), list(DIAG_OUT)]),
+      DIAG_SEND,
+    ], [["취소", false, "ghost"], ["만들기", true, "primary"]]);
+    if (!ok) return;
+    const r = await api().export_diagnostics();
+    if (!r.ok) return this.alert("진단 정보를 만들지 못했어요", r.error);
+    const go = await this.modal("진단 정보를 만들었어요", [
+      `바탕화면에 ${r.name} 파일을 만들었어요. 탐색기 창에서 바로 보여 드릴게요.`,
+      "디스코드 🐞버그-제보에 글을 쓰고 이 파일을 끌어다 놓아 주세요. 어떤 상황에서 문제가 생겼는지 한 줄만 적어 주시면 충분해요.",
+      "로그인 정보, 비밀번호, 업로드 기록, 타임라인 내용은 들어 있지 않고, PC 사용자 이름은 <사용자>로 바꿨어요. " + DIAG_SEND,
+    ], [["닫기", false, "ghost"], ["디스코드 열기", true, "primary"]]);
+    if (go) api().open_feedback();
   },
   toast(msg) {
     const t = el("div", { className: "toast" }, [icon("check"), msg]);
@@ -857,6 +893,8 @@ const app = {
     };
     const btnFeedback = el("button", { className: "btn" }, [icon("chat"), "디스코드 열기"]);
     btnFeedback.onclick = () => api().open_feedback();
+    const btnDiag = el("button", { className: "btn" }, [icon("file"), "진단 정보 만들기"]);
+    btnDiag.onclick = () => { $("modal").classList.add("hidden"); this.exportDiagnostics(); };
     const btnOpen = el("button", { className: "btn" }, [icon("folder"), "폴더 열기"]);
     btnOpen.onclick = () => api().open_save_dir();
     const loginText = el("p", { textContent: st.logged_in ? `${st.nick} (${st.id}) 로그인됨` : "등록된 로그인이 없어요. 업로드할 때 로그인해도 돼요." });
@@ -891,7 +929,8 @@ const app = {
       el("div", { className: "field" }, [el("label", { textContent: "타임라인 저장 폴더" }), pathBox, el("div", { className: "row", style: "margin-top:8px" }, [btnChange, btnOpen])]),
       el("div", { className: "field" }, [el("label", { textContent: "SOOP 로그인" }), loginText, el("div", { className: "row" }, [btnLogin])]),
       el("div", { className: "field" }, [el("label", { textContent: "피드백 · 버그 제보" }),
-        el("div", { className: "row" }, [btnFeedback, el("span", { className: "hint", textContent: "디스코드 서버가 브라우저로 열려요" })])]),
+        el("div", { className: "row" }, [btnFeedback, el("span", { className: "hint", textContent: "디스코드 서버가 브라우저로 열려요" })]),
+        el("div", { className: "row", style: "margin-top:8px" }, [btnDiag, el("span", { className: "hint", textContent: "문제를 알려 줄 때 올릴 파일을 바탕화면에 만들어요" })])]),
       this.privacyBox(),
     ], [["닫기", true, "primary"]]);
   },
