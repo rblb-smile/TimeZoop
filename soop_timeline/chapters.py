@@ -95,7 +95,7 @@ SUMMARY_SCHEMA = {
 
 
 def summarize_blocks(llm: LocalLLM, vod: VodInfo, blocks: list[Block], progress=None) -> None:
-    for b in blocks:
+    def one(b: Block) -> None:
         user = (
             f"방송 제목: {vod.title}\n방송인: {vod.bj_nick}\n\n"
             f"[{fmt_time(b.t0)} ~ {fmt_time(b.t1)}] 구간 대본:\n{b.transcript()}\n\n"
@@ -104,8 +104,8 @@ def summarize_blocks(llm: LocalLLM, vod: VodInfo, blocks: list[Block], progress=
         )
         out = llm.json(SYSTEM, user, SUMMARY_SCHEMA, max_tokens=200)
         b.summary, b.activity = out["summary"].strip(), out["activity"].strip()
-        if progress:
-            progress(b.i + 1, len(blocks))
+
+    llm.map(one, blocks, progress)
 
 
 SAME_SCHEMA = {
@@ -124,8 +124,8 @@ TITLE_SCHEMA = {
 def _split_points(llm: LocalLLM, blocks: list[Block], step=None) -> list[int]:
     """이웃한 두 블록씩 비교해 주제가 바뀌는 블록 번호를 고른다.
     긴 목록을 한 번에 묶게 하면 작은 모델은 결과가 매번 달라져서, 쉬운 질문으로 쪼갰다."""
-    starts = [0]
-    for a, b in zip(blocks, blocks[1:]):
+    def same(pair) -> bool:
+        a, b = pair
         user = (
             f"구간 A [{fmt_time(a.t0)}] ({a.activity}) {a.summary}\n"
             f"A 끝부분 대본:\n{a.transcript()[-700:]}\n\n"
@@ -134,11 +134,10 @@ def _split_points(llm: LocalLLM, blocks: list[Block], step=None) -> list[int]:
             "B가 A와 같은 주제나 활동을 이어가고 있는가? "
             "같은 게임을 계속하거나 같은 이야기를 계속하면 true, 새 활동이나 새 주제로 넘어갔으면 false."
         )
-        if not llm.json(SYSTEM, user, SAME_SCHEMA, max_tokens=30, temperature=0.0)["same"]:
-            starts.append(b.i)
-        if step:
-            step(b.i, len(blocks) - 1)
-    return starts
+        return llm.json(SYSTEM, user, SAME_SCHEMA, max_tokens=30, temperature=0.0)["same"]
+
+    pairs = list(zip(blocks, blocks[1:]))
+    return [0] + [b.i for (_, b), s in zip(pairs, llm.map(same, pairs, step)) if not s]
 
 
 def _merge_quiet(starts: list[int], blocks: list[Block], min_len: float = 600.0, busy: float = 1.3) -> list[int]:
@@ -216,12 +215,9 @@ HL_SCHEMA = {
 
 
 def title_highlights(llm: LocalLLM, segments: list[Segment], highlights: list[Highlight], step=None) -> list[Entry]:
-    entries: list[Entry] = []
-    for n, h in enumerate(highlights, 1):
-        if step:
-            step(n, len(highlights))
+    def one(h: Highlight) -> Entry | None:
         if h.kind == "balloon":
-            continue  # 후원 자체는 타임라인에 넣지 않는다 (사용자 요청)
+            return None  # 후원 자체는 타임라인에 넣지 않는다 (사용자 요청)
         near = [s for s in segments if h.t - 40 <= s.t0 <= h.t + 60]
         text = "\n".join(f"[{fmt_time(s.t0)}] {s.text}" for s in near)[:2500] or "(말소리 없음)"
         user = (
@@ -233,8 +229,10 @@ def title_highlights(llm: LocalLLM, segments: list[Segment], highlights: list[Hi
         title = out["title"].strip()
         # '채팅 급증'처럼 반응 이름을 그대로 베낀 제목은 내용이 없으므로 버린다
         if out["keep"] and title and title not in REACTION_LABEL.values():
-            entries.append(Entry(h.t, title, "highlight"))
-    return entries
+            return Entry(h.t, title, "highlight")
+        return None
+
+    return [e for e in llm.map(one, highlights, step) if e]
 
 
 def merge_entries(chapters: list[Entry], highlights: list[Entry], gap: float = 75.0) -> list[Entry]:

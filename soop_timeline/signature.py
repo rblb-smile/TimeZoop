@@ -120,7 +120,10 @@ def levels(times: list[float], events: list[ChatEvent], duration: float, sc: lis
 # 별점줍 줄 맞춤: SOOP 댓글은 웹 페이지라 일반 공백 여러 개를 1칸으로 줄인다.
 # 그래서 줄어들지 않는 공백(전각·반각·얇은 공백)으로 채워 별점을 같은 세로줄에 놓는다.
 # 너비는 SOOP 댓글 글꼴(Pretendard)로 그린 페이지에서 잰 값 (글자 크기 1 기준, 전각 공백 = 한글 한 글자)
-SPACES = (("\u3000", 0.864), ("\u2002", 0.500), ("\u2009", 0.124))
+SPACES = (("\u3000", 0.938), ("\u2002", 0.500), ("\u2009", 0.124))
+# 전각 공백은 바로 앞이 한글이면 한글 글꼴 모양(0.864)으로 좁아진다 (첫 칸만 0.938).
+# 표식 문자나 괄호·영문·숫자 뒤에서는 모두 0.938.
+W_IDEO_HANGUL = 0.864
 W_HANGUL, W_SPACE, W_EMOJI = 0.864, 0.251, 1.373
 W_PUNCT = {"·": 0.254, ".": 0.254, ",": 0.258, "!": 0.257, "?": 0.479, "(": 0.341, ")": 0.341,
            "[": 0.341, "]": 0.341, "-": 0.433, "~": 0.627, ":": 0.254, "/": 0.334, "&": 0.609,
@@ -158,14 +161,24 @@ def text_width(text: str) -> float:
     return w
 
 
-def pad_to(width: float, target: float) -> str:
-    """target 너비까지 줄어들지 않는 공백으로 채운다 (넓은 것부터)."""
+def _is_hangul(ch: str) -> bool:
+    o = ord(ch)
+    return 0xAC00 <= o <= 0xD7A3 or 0x3130 <= o <= 0x318F
+
+
+def pad_to(width: float, target: float, before: str = "") -> str:
+    """target 너비까지 줄어들지 않는 공백으로 채운다 (넓은 것부터). before: 공백 바로 앞 글자."""
     gap = max(target - width, MIN_GAP)
     out = []
     for ch, w in SPACES:
-        n = int((gap + 0.06) // w)
+        if ch == "\u3000":
+            rest = W_IDEO_HANGUL if before and _is_hangul(before[-1]) else w
+            n = 0 if gap + 0.06 < w else 1 + int((gap + 0.06 - w) // rest)
+            gap -= (w + (n - 1) * rest) if n else 0
+        else:
+            n = int((gap + 0.06) // w)
+            gap -= n * w
         out.append(ch * n)
-        gap -= n * w
     return "".join(out)
 
 
@@ -192,7 +205,7 @@ def compose(vod: VodInfo, body: str, events: list[ChatEvent], limit: int = COMME
     if o["stars"]:
         widths = [text_width(f"{fmt_time(e.t)} {e.title}") for e in entries]  # 시각 숫자 너비도 줄마다 다르다
         target = min(max(widths), MAX_TITLE) + MIN_GAP
-        lines = [f"{fmt_time(e.t)} {e.title}{MARK}{pad_to(w, target)}{gauge(level, o['style'])}"
+        lines = [f"{fmt_time(e.t)} {e.title}{MARK}{pad_to(w, target, MARK or e.title)}{gauge(level, o['style'])}"
                  for e, level, w in zip(entries, lv, widths)]
     else:
         lines = [f"{fmt_time(e.t)} {e.title}{MARK}" for e in entries]

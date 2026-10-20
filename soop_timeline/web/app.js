@@ -608,6 +608,13 @@ const app = {
     this.setBar(0);
     this.renderPause();
     $("progressVod").textContent = chk.title;
+    // 고른 타임라인 개수 · 최소 · 최대를 진행 화면에서도 보여 준다
+    const chip = (label, value) => el("span", { className: "pc-item" }, [label, el("b", { textContent: value })]);
+    $("progressCount").replaceChildren(
+      chip("타임라인 개수", amounts.find(([v]) => v === amount)[1]),
+      chip("최소", minN ? `${minN}개` : "알아서"),
+      chip("최대", maxN ? `${maxN}개` : "알아서"),
+    );
     this.onProgress({ stage: "fetch", message: "다시보기 정보를 확인하고 있어요", ratio: null });
     this.show("viewProgress");
   },
@@ -868,9 +875,11 @@ const app = {
     btn.disabled = false;
     btn.lastChild.textContent = "업로드";
     if (r.ok) {
-      const home = await this.modal("업로드했어요", `${r.nick} 계정으로 댓글 ${r.count}개를 올렸어요.`,
-        [["계속 보기", false, "ghost"], ["홈으로", true, "primary"]]);
-      if (home) this.finish();
+      const next = await this.modal("업로드했어요", `${r.nick} 계정으로 댓글 ${r.count}개를 올렸어요.
+다시보기 페이지에서 올라간 댓글을 확인할 수 있어요.`,
+        [["홈으로", "home", "ghost"], ["계속 보기", false, "ghost"], ["가서 확인하기", "go", "primary"]]);
+      if (next === "go") api().open_vod();
+      else if (next === "home") this.finish();
     }
     else this.failAlert("업로드하지 못했어요", [r.error, "작성한 타임라인은 저장 폴더에 그대로 남아 있어요."]);
   },

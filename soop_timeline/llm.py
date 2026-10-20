@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 import socket
 import subprocess
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import httpx
@@ -25,9 +27,10 @@ def _free_port() -> int:
 class LocalLLM:
     """with LocalLLM() as llm: llm.json(system, user, schema)"""
 
-    def __init__(self, model: str = DEFAULT_MODEL, ctx: int = 8192, gpu_layers: int = 99):
+    def __init__(self, model: str = DEFAULT_MODEL, ctx: int = 8192, gpu_layers: int = 99, parallel: int = 2):
         self.model_path = LLM_DIR / model
-        self.ctx = ctx
+        self.ctx = ctx  # 요청 하나가 쓸 수 있는 길이
+        self.parallel = parallel
         self.gpu_layers = gpu_layers
         self.port = _free_port()
         self.proc: subprocess.Popen | None = None
@@ -41,9 +44,9 @@ class LocalLLM:
         self.proc = subprocess.Popen(
             [str(LLAMA_DIR / "llama-server.exe"), "-m", str(self.model_path),
              "--host", "127.0.0.1", "--port", str(self.port),
-             "-c", str(self.ctx), "-ngl", str(self.gpu_layers), "--no-webui",
-             # 다른 작업을 할 수 있게: 요청은 한 번에 하나(-np 1), CPU 스레드 절반
-             "-np", "1", "-t", str(control.threads())],
+             "-c", str(self.ctx * self.parallel), "-ngl", str(self.gpu_layers), "--no-webui",
+             # 요청 2개를 그래픽카드에서 함께 처리한다 (CPU 부담은 거의 그대로). CPU 스레드는 절반만
+             "-np", str(self.parallel), "-t", str(control.threads())],
             stdout=log, stderr=subprocess.STDOUT,
             creationflags=control.child_flags(),
         )
@@ -68,6 +71,22 @@ class LocalLLM:
                 self.proc.wait(10)
             except subprocess.TimeoutExpired:
                 self.proc.kill()
+
+    def map(self, fn, items: list, step=None) -> list:
+        """서로 상관없는 질문들을 동시에 보내고, 결과는 items 순서대로 돌려준다. step(끝난 수, 전체)."""
+        done, lock = 0, threading.Lock()
+
+        def run(item):
+            nonlocal done
+            out = fn(item)
+            if step:
+                with lock:
+                    done += 1
+                    step(done, len(items))
+            return out
+
+        with ThreadPoolExecutor(self.parallel) as ex:
+            return list(ex.map(run, items))
 
     def json(self, system: str, user: str, schema: dict, max_tokens: int = 1024, temperature: float = 0.3):
         """JSON 스키마에 맞는 답만 나오도록 강제해서 받는다. 출력이 잘리면 한 번 더 시도한다."""

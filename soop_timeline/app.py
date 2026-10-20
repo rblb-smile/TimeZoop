@@ -358,6 +358,11 @@ class Api:
         """피드백·버그 제보용 디스코드 서버를 브라우저로 연다. 아무 정보도 함께 보내지 않는다."""
         webbrowser.open("https://discord.gg/jgCfUUYncp")
 
+    def open_vod(self) -> None:
+        """댓글을 올린 다시보기 페이지를 브라우저로 연다 (올린 댓글 확인용)."""
+        if self._vod:
+            webbrowser.open(f"https://vod.sooplive.com/player/{self._vod.title_no}")
+
     def open_vod_at(self, seconds: float) -> None:
         if self._vod:
             webbrowser.open(f"https://vod.sooplive.com/player/{self._vod.title_no}?change_second={int(seconds)}")
