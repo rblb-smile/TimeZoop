@@ -25,9 +25,9 @@ BLOCK = 300.0
 #   min_len: 이보다 짧고 채팅도 평소 수준인 장면은 앞 장면에 합친다(초), busy: 짧아도 남기는 채팅 밀도(평소 대비 배수)
 #   z: 채팅이 터진 순간으로 볼 반응 기준, hl_gap: 그런 순간 사이 최소 간격(초), merge_gap: 장면 시작과 겹쳐 뺄 범위(초)
 DENSITY = {
-    "many": {"min_len": 600.0, "busy": 1.3, "z": 1.8, "hl_gap": 150.0, "merge_gap": 75.0},
-    "normal": {"min_len": 900.0, "busy": 1.6, "z": 2.0, "hl_gap": 180.0, "merge_gap": 90.0},
-    "few": {"min_len": 1125.0, "busy": 1.72, "z": 2.2, "hl_gap": 210.0, "merge_gap": 105.0},
+    "many": {"min_len": 600.0, "busy": 1.4, "z": 1.4, "hl_gap": 90.0, "merge_gap": 45.0},
+    "normal": {"min_len": 600.0, "busy": 1.3, "z": 1.8, "hl_gap": 150.0, "merge_gap": 75.0},
+    "few": {"min_len": 1000.0, "busy": 1.6, "z": 2.1, "hl_gap": 210.0, "merge_gap": 105.0},
 }
 DEFAULT_DENSITY = "normal"
 
