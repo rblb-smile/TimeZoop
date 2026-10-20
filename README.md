@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/python-3.13-3776ab?style=flat-square&labelColor=17152a&logo=python&logoColor=white" alt="python">
   <img src="https://img.shields.io/badge/AI-100%25%20local-ff2e88?style=flat-square&labelColor=17152a" alt="local AI">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a3a4b2?style=flat-square&labelColor=17152a" alt="license"></a>
+  <a href="https://discord.gg/jgCfUUYncp"><img src="https://img.shields.io/badge/Discord-피드백-5865F2?style=flat-square&labelColor=17152a&logo=discord&logoColor=white" alt="discord"></a>
 </p>
 
 <p align="center">
@@ -19,7 +20,8 @@
 <p align="center">
   <a href="../../releases/latest"><b>⬇ 다운로드</b></a> ·
   <a href="사용설명서.md">사용설명서</a> ·
-  <a href="패치노트.md">패치노트</a>
+  <a href="패치노트.md">패치노트</a> ·
+  <a href="https://discord.gg/jgCfUUYncp">디스코드 (피드백 · 버그 제보)</a>
 </p>
 
 <br>
@@ -38,6 +40,7 @@
 - [Models](#models)
 - [개발](#개발)
 - [개인정보](#개인정보)
+- [피드백](#피드백)
 - [License](#license)
 
 ## 이런 걸 만들어 줘요
@@ -236,6 +239,12 @@ PyInstaller → 개인정보 검사(분석 데이터·설정·로그인 파일, 
 - **로그인 쿠키는 SOOP 서버(`*.sooplive.com`, `*.sooplive.co.kr`)로만 보냅니다.** 로그인 확인, 댓글 작성, 접근 제한 VOD를 받을 때만 씁니다. 코드는 [`soop_account.py`](soop_timeline/soop_account.py)에서 볼 수 있어요.
 - **방송 음성과 채팅은 외부 AI 서비스로 보내지 않습니다.** 사용 기록 수집·통계 전송도 없습니다.
 - 올린 댓글에는 꼬리말과 보이지 않는 표식 문자가 들어가지만, 개인정보는 들어가지 않습니다.
+
+## 피드백
+
+버그 제보, 기능 건의, 사용법 질문은 **[디스코드 서버](https://discord.gg/jgCfUUYncp)** 로 와 주세요. 앱의 설정 화면이나 오류 창의 **[디스코드에 알리기]** 버튼으로도 바로 갈 수 있어요.
+
+제보할 때 함께 알려 주시면 빨리 고칠 수 있어요: 타임줍 버전 · 다시보기 링크 · 어느 단계에서 멈췄는지 · 화면 스크린샷
 
 ## License
 

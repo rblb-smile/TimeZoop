@@ -149,6 +149,11 @@ const app = {
     }
   },
   alert(title, msg) { return this.modal(title, msg, [["확인", true, "primary"]]); },
+  // 실패 창: 확인 + 디스코드에 알리기 (누르면 디스코드만 열리고, 내용은 사용자가 직접 적는다)
+  async failAlert(title, msg) {
+    const r = await this.modal(title, msg, [["디스코드에 알리기", "discord", "ghost"], ["확인", true, "primary"]]);
+    if (r === "discord") api().open_feedback();
+  },
   toast(msg) {
     const t = el("div", { className: "toast" }, [icon("check"), msg]);
     $("toasts").append(t);
@@ -370,7 +375,7 @@ const app = {
   onTrackerClick() {
     const j = this.job;
     if (j.result) { const r = j.result; this.job = { active: false }; this.openTimeline(r); }
-    else if (j.error) { const m = j.error; this.job = { active: false }; this.renderTracker(); this.alert("분석하지 못했어요", m); }
+    else if (j.error) { const m = j.error; this.job = { active: false }; this.renderTracker(); this.failAlert("분석하지 못했어요", m); }
     else this.show("viewProgress");
   },
   onJobDone(result) {
@@ -394,7 +399,7 @@ const app = {
   onJobError(message) {
     $("btnAnalyze").disabled = false;
     this.job.active = false;
-    if (this.view === "viewProgress") { this.job = { active: false }; this.show("viewHome"); this.alert("분석하지 못했어요", message); return; }
+    if (this.view === "viewProgress") { this.job = { active: false }; this.show("viewHome"); this.failAlert("분석하지 못했어요", message); return; }
     this.job.error = message;
     this.renderTracker();
   },
@@ -801,7 +806,7 @@ const app = {
         [["계속 보기", false, "ghost"], ["홈으로", true, "primary"]]);
       if (home) this.finish();
     }
-    else this.alert("업로드하지 못했어요", [r.error, "작성한 타임라인은 저장 폴더에 그대로 남아 있어요."]);
+    else this.failAlert("업로드하지 못했어요", [r.error, "작성한 타임라인은 저장 폴더에 그대로 남아 있어요."]);
   },
 
   // ---------- 설정 · 로그인 ----------
@@ -825,6 +830,8 @@ const app = {
       const r = await api().choose_save_dir();
       if (r.ok) { pathBox.textContent = r.save_dir; this.toast("저장 폴더를 바꿨어요"); }
     };
+    const btnFeedback = el("button", { className: "btn" }, [icon("chat"), "디스코드 열기"]);
+    btnFeedback.onclick = () => api().open_feedback();
     const btnOpen = el("button", { className: "btn" }, [icon("folder"), "폴더 열기"]);
     btnOpen.onclick = () => api().open_save_dir();
     const loginText = el("p", { textContent: st.logged_in ? `${st.nick} (${st.id}) 로그인됨` : "등록된 로그인이 없어요. 업로드할 때 로그인해도 돼요." });
@@ -858,6 +865,8 @@ const app = {
       el("div", { className: "field" }, [el("label", { textContent: "버튼 효과음" }), sound]),
       el("div", { className: "field" }, [el("label", { textContent: "타임라인 저장 폴더" }), pathBox, el("div", { className: "row", style: "margin-top:8px" }, [btnChange, btnOpen])]),
       el("div", { className: "field" }, [el("label", { textContent: "SOOP 로그인" }), loginText, el("div", { className: "row" }, [btnLogin])]),
+      el("div", { className: "field" }, [el("label", { textContent: "피드백 · 버그 제보" }),
+        el("div", { className: "row" }, [btnFeedback, el("span", { className: "hint", textContent: "디스코드 서버가 브라우저로 열려요" })])]),
       this.privacyBox(),
     ], [["닫기", true, "primary"]]);
   },

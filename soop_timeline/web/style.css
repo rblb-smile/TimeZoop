@@ -448,3 +448,5 @@ body.dock-open .tracker { bottom: 92px; }  /* 편집·미리보기 하단 버튼
   .brand-divider { display: none; }
   .meter .track { display: none; }
 }
+
+.field .hint { font-size: 12.5px; color: var(--text-3); align-self: center; }

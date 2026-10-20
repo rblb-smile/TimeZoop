@@ -321,6 +321,10 @@ class Api:
                        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         return {"ok": True}
 
+    def open_feedback(self) -> None:
+        """피드백·버그 제보용 디스코드 서버를 브라우저로 연다. 아무 정보도 함께 보내지 않는다."""
+        webbrowser.open("https://discord.gg/jgCfUUYncp")
+
     def open_vod_at(self, seconds: float) -> None:
         if self._vod:
             webbrowser.open(f"https://vod.sooplive.com/player/{self._vod.title_no}?change_second={int(seconds)}")
