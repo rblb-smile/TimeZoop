@@ -117,6 +117,39 @@ def levels(times: list[float], events: list[ChatEvent], duration: float, sc: lis
 
 # ---------- 댓글 만들기 ----------
 
+# 별점줍 줄 맞춤: SOOP 댓글은 웹 페이지라 일반 공백 여러 개를 1칸으로 줄인다.
+# 그래서 줄어들지 않는 전각 공백(1칸)과 반각 공백(반 칸)으로 채워 별점을 같은 세로줄에 놓는다.
+FULL_SPACE, HALF_SPACE = "\u3000", "\u2002"
+MIN_GAP = 1.5  # 가장 긴 제목 뒤에도 남길 간격 (칸)
+MAX_TITLE = 24.0  # 이보다 긴 제목은 맞추지 않고 바로 뒤에 붙인다 (좁은 댓글 칸에서 별점이 다음 줄로 넘어가지 않게)
+
+
+def text_width(text: str) -> float:
+    """비례 글꼴에서 보이는 너비를 한글 1칸 기준으로 어림한다."""
+    w = 0.0
+    for ch in text:
+        o = ord(ch)
+        if ch in MARK:
+            continue
+        if 0xAC00 <= o <= 0xD7A3 or 0x3130 <= o <= 0x318F or 0x4E00 <= o <= 0x9FFF or o in (0x3000,):
+            w += 1.0  # 한글·한자·전각
+        elif o >= 0x1F000 or 0x2600 <= o <= 0x27BF:
+            w += 1.2  # 이모지
+        elif ch == " ":
+            w += 0.28
+        elif ch.isdigit() or ch.isalpha():
+            w += 0.55 if ch.isupper() or ch.isdigit() else 0.5
+        else:
+            w += 0.32  # 문장부호
+    return w
+
+
+def pad_to(width: float, target: float) -> str:
+    gap = max(target - width, MIN_GAP)
+    full = int(gap)
+    return FULL_SPACE * full + (HALF_SPACE if gap - full >= 0.25 else "")
+
+
 def header(times: list[float], sc: list[float], o: dict) -> str:
     """머리말: 가장 반응이 컸던 장면의 시각과 분당 반응 점수. 꺼 두었거나 장면이 없으면 빈 문자열."""
     if not o["head"] or not times:
@@ -137,8 +170,13 @@ def compose(vod: VodInfo, body: str, events: list[ChatEvent], limit: int = COMME
     sc = scores(times, events, vod.duration)
     lv = levels(times, events, vod.duration, sc)
     head = header(times, sc, o)
-    lines = [f"{fmt_time(e.t)} {e.title}{MARK}" + (f"  {gauge(level, o['style'])}" if o["stars"] else "")
-             for e, level in zip(entries, lv)]
+    if o["stars"]:
+        widths = [text_width(e.title) for e in entries]
+        target = min(max(widths), MAX_TITLE) + MIN_GAP
+        lines = [f"{fmt_time(e.t)} {e.title}{MARK}{pad_to(w, target)}{gauge(level, o['style'])}"
+                 for e, level, w in zip(entries, lv, widths)]
+    else:
+        lines = [f"{fmt_time(e.t)} {e.title}{MARK}" for e in entries]
 
     def pack(chunk: list[str], i: int, n: int) -> str:
         top = []

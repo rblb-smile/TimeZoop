@@ -4,10 +4,10 @@ const api = () => window.pywebview.api;
 const LIMIT = 5000;
 // 댓글 서명(BEST ZOOP 머리말·별점줍·꼬리말·보이지 않는 표식)은 Python(signature.py)이 업로드·복사할 때 붙인다.
 // 화면에서는 머리말·별점줍을 켜고 끄거나 모양만 고를 수 있고(모든 줄에 한 번에), 꼬리말은 항상 들어간다.
-const SIGN_HEAD = 45, SIGN_FOOT = 34, SIGN_STARS = 17, SIGN_MARK = 3;  // 글자 수 안내용 어림값
+const SIGN_HEAD = 45, SIGN_FOOT = 34, SIGN_STARS = 27, SIGN_MARK = 3;  // 별점줍은 줄 맞춤 공백 포함  // 글자 수 안내용 어림값
 const STYLE_NAMES = { bracket: "낫표", angle: "괄호", pang: "팡!", dust: "별가루", star: "별하나", none: "없음" };
 const STYLE_MARKS = { bracket: "「 」", angle: "〈 〉", pang: "-ˏˋ ˎˊ-", dust: "⁺₊ ₊⁺", star: "⋆ ⋆", none: "" };
-const STARS_RE = /^(.*?)\s{2}(\S*\s?[✦✧]{5}.*)$/;  // 줄 끝의 별점줍 (모양과 상관없이)
+const STARS_RE = /^(.*?)(\s+)(\S*\s?[✦✧]{5}.*)$/u;  // 줄 끝의 별점줍 (모양과 상관없이)
 const PRIVACY = "타임줍은 SOOP 아이디와 비밀번호를 수집하거나 저장하지 않습니다. " +
   "로그인은 SOOP 공식 로그인 페이지에서 직접 진행되며, 프로그램은 로그인 후 발급되는 로그인 상태 정보(쿠키)만 " +
   "이 PC에 암호화해 저장합니다. 이 정보는 댓글 업로드에만 쓰이며, 로그아웃하면 즉시 삭제됩니다.";
@@ -769,7 +769,7 @@ const app = {
       } else if (m) {
         const sm = (m[2] || "").match(STARS_RE);
         pre.append(el("span", { className: "tl", textContent: m[1] }), sm ? sm[1] : m[2] || "");
-        if (sm) pre.append("  ", el("span", { className: "gauge-pre", title: "별점줍", textContent: sm[2] }));
+        if (sm) pre.append(sm[2], el("span", { className: "gauge-pre", title: "별점줍", textContent: sm[3] }));
       } else pre.append(line);
       pre.append("\n");
     }
