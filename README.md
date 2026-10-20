@@ -1,0 +1,220 @@
+<p align="center">
+  <img src="docs/images/banner.png" alt="타임줍 TimeZoop — 재밌는 시간만 줍줍" width="100%">
+</p>
+
+<p align="center">
+  <a href="../../releases/latest"><img src="https://img.shields.io/github/v/release/rblb-smile/TimeZoop?style=flat-square&color=d6ff3a&labelColor=17152a&label=release" alt="release"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-5b1f8f?style=flat-square&labelColor=17152a" alt="platform">
+  <img src="https://img.shields.io/badge/GPU-NVIDIA%20CUDA-76b900?style=flat-square&labelColor=17152a&logo=nvidia&logoColor=white" alt="CUDA">
+  <img src="https://img.shields.io/badge/python-3.13-3776ab?style=flat-square&labelColor=17152a&logo=python&logoColor=white" alt="python">
+  <img src="https://img.shields.io/badge/AI-100%25%20local-ff2e88?style=flat-square&labelColor=17152a" alt="local AI">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-a3a4b2?style=flat-square&labelColor=17152a" alt="license"></a>
+</p>
+
+<p align="center">
+  <b>SOOP 다시보기 링크 하나로 하이라이트 타임라인을 만들고, 댓글로 올려 주는 Windows 앱</b><br>
+  채팅과 방송 음성을 <b>내 PC 안의 AI</b>로 분석합니다. 외부 AI 서비스로는 아무것도 보내지 않습니다.
+</p>
+
+<p align="center">
+  <a href="../../releases/latest"><b>⬇ 다운로드</b></a> ·
+  <a href="사용설명서.md">사용설명서</a> ·
+  <a href="패치노트.md">패치노트</a>
+</p>
+
+<br>
+
+<p align="center"><img src="docs/images/home.png" alt="홈 화면" width="88%"></p>
+
+## 목차
+
+- [이런 걸 만들어 줘요](#이런-걸-만들어-줘요)
+- [주요 기능](#주요-기능)
+- [화면](#화면)
+- [설치](#설치)
+- [어떻게 동작하나요](#어떻게-동작하나요)
+- [Tech Stack](#tech-stack)
+- [Models](#models)
+- [개발](#개발)
+- [개인정보](#개인정보)
+- [License](#license)
+
+## 이런 걸 만들어 줘요
+
+```
+🥇 BEST ZOOP 02:08:52 ⟡ 24 ZOOP ⟡
+
+00:00:00 오프닝 노래와 오늘 방송 계획 소개  ⁺₊ ✦✦✦✧✧ ₊⁺
+00:12:40 시청자 질문 받기 · 요즘 근황 토크  ⁺₊ ✦✦✧✧✧ ₊⁺
+00:48:52 드디어 보스 클리어! 채팅 폭발  ⁺₊ ✦✦✦✦✦ ₊⁺
+01:10:10 후원 리액션과 감사 인사  ⁺₊ ✦✦✦✧✧ ₊⁺
+
+‧₊˚✧  made with  TIMEZOOP  ✧˚₊‧
+```
+
+SOOP 댓글에 올리면 시각이 링크가 되어, 누르면 그 장면으로 바로 이동합니다.
+
+- **BEST ZOOP** — 채팅 반응이 가장 컸던 장면과 그 장면의 분당 반응 점수
+- **별점줍** — 줄마다 그 장면의 반응을 별 1~5개로 (같은 방송 안 순위)
+
+## 주요 기능
+
+| | 기능 | 설명 |
+|:-:|---|---|
+| 🎯 | **자동 하이라이트** | 채팅이 몰린 순간 + 방송 음성으로 주제가 바뀐 지점을 찾아 장면마다 제목을 붙여요. 개수 제한 없이 소통이 몰린 만큼 |
+| 🧩 | **여러 파일 VOD** | 나뉜 다시보기도 하나로 이어진 영상처럼 시각을 맞춰요 |
+| ✏️ | **편집 + 자동 저장** | 제목·시각 수정, 줄 추가·삭제, ▶로 그 장면 열기. 고칠 때마다 `문서\타임줍`에 저장 |
+| 🎨 | **댓글 꾸미기** | 머리말 메달(🥇 👑 🏆), 별점줍 모양 6가지, 켜기/끄기 — 모든 줄에 한 번에 |
+| 💬 | **원클릭 업로드** | SOOP 공식 로그인 창으로 로그인 → 댓글로 바로. 5,000자를 넘으면 나눠서 올려요 |
+| 🔞 | **접근 제한 VOD** | 연령·구독 제한 다시보기는 권한 있는 계정으로 로그인했을 때만 분석 |
+| ⏸️ | **작업 관리** | 진행률·남은 시간(이 PC 속도를 학습), 일시정지/다시 시작, 낮은 우선순위로 실행 |
+| 🌙 | **다크 / 라이트** | 시스템 설정을 따르거나 직접 고르기 |
+
+## 화면
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/editor.png" alt="편집 화면"><p align="center"><sub>편집 · 댓글 꾸미기</sub></p></td>
+    <td width="50%"><img src="docs/images/preview.png" alt="댓글 미리보기"><p align="center"><sub>댓글 미리보기</sub></p></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/images/progress.png" alt="분석 진행"><p align="center"><sub>분석 진행 · 일시정지 · 작업하는 동안 살펴보기</sub></p></td>
+  </tr>
+</table>
+
+## 설치
+
+1. [Releases](../../releases/latest)에서 `TimeZoop_Setup_<버전>.exe`를 받아 실행합니다.
+   "Windows의 PC 보호" 창이 뜨면 **추가 정보 → 실행** (코드 서명 인증서가 없어서 뜨는 안내예요).
+2. 설치 폴더를 고르고 설치 → 바탕화면의 **타임줍** 아이콘으로 실행합니다.
+3. 처음 실행할 때 AI 모델(약 10GB)을 한 번 받습니다. 끊겨도 이어서 받아요.
+
+| | 권장 사양 |
+|---|---|
+| OS | Windows 10 / 11 64비트 |
+| GPU | NVIDIA, VRAM 12GB 이상 |
+| RAM | 16GB 이상 |
+| 저장 공간 | 약 12GB (프로그램 1.7GB + 모델 10GB) |
+
+> [!NOTE]
+> AMD·Intel 그래픽이나 내장 그래픽에서는 동작하지 않습니다. 설치 파일은 이 저장소의 Releases에서만 받아 주세요.
+
+## 어떻게 동작하나요
+
+```mermaid
+flowchart LR
+    A[SOOP 다시보기 링크] --> B[Fetch<br/>VOD 정보 · 채팅 · 음성]
+    B --> C[Chat<br/>채팅 급증 탐지]
+    B --> D[STT<br/>Whisper large-v3]
+    C --> E[LLM<br/>Gemma 4 12B]
+    D --> E
+    E --> F[타임라인]
+    F --> G[편집 · 댓글 꾸미기]
+    G --> H[SOOP 댓글 업로드]
+```
+
+1. **Fetch** — VOD 정보, 채팅 다시보기(5분 단위 XML), 방송 음성(HLS). 여러 파일 VOD는 오프셋을 더해 하나로
+2. **Chat** — 10초 단위로 채팅 수를 세고, 평소(이동 중앙값) 대비 몰린 정도를 z-score로. 웃음·감탄·당황 반응에 가중치, 봇 계정·반복 금액 후원은 제외
+3. **STT** — Whisper large-v3로 방송 전체를 받아쓰기 (GPU, int8, 배치 16)
+4. **LLM** — 5분 구간 요약 → 이웃 구간끼리 비교해 주제 전환점 찾기 → 짧고 조용한 장면은 합치기 → 장면 제목 → 대본 기준으로 시작 시각을 초 단위까지 보정
+
+5시간 방송 기준 VRAM 12GB GPU에서 약 10분 안팎 (같은 VOD를 다시 분석하면 받아 둔 데이터를 써서 더 빨라요).
+
+## Tech Stack
+
+<p>
+  <img src="https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black" alt="JavaScript">
+  <img src="https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white" alt="HTML5">
+  <img src="https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white" alt="CSS3">
+  <img src="https://img.shields.io/badge/NVIDIA%20CUDA-76B900?style=for-the-badge&logo=nvidia&logoColor=white" alt="CUDA">
+  <img src="https://img.shields.io/badge/llama.cpp-000000?style=for-the-badge" alt="llama.cpp">
+  <img src="https://img.shields.io/badge/FFmpeg-007808?style=for-the-badge&logo=ffmpeg&logoColor=white" alt="FFmpeg">
+  <img src="https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white" alt="NumPy">
+  <img src="https://img.shields.io/badge/Hugging%20Face-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="Hugging Face">
+</p>
+
+| 영역 | 사용 기술 |
+| --- | --- |
+| Desktop UI | [pywebview](https://pywebview.flowrl.com/) + Microsoft Edge WebView2, HTML / CSS / Vanilla JS, [Pretendard](https://github.com/orioncactus/pretendard) |
+| Speech-to-Text | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) + [CTranslate2](https://github.com/OpenNMT/CTranslate2) (CUDA, int8_float16, VAD) |
+| LLM Runtime | [llama.cpp](https://github.com/ggml-org/llama.cpp) `llama-server` (CUDA, 8k context, JSON Schema로 출력 형식 강제) |
+| Media | [FFmpeg](https://ffmpeg.org/) (HLS 음성 수신, 16 kHz PCM 디코딩) |
+| Chat Analysis | [NumPy](https://numpy.org/) (이동 중앙값 기준 Poisson z-score) |
+| HTTP | [httpx](https://www.python-httpx.org/) |
+| Credential | Windows DPAPI로 로그인 쿠키 암호화 |
+| Packaging | [PyInstaller](https://pyinstaller.org/) + [Inno Setup](https://jrsoftware.org/isinfo.php) |
+
+## Models
+
+| 용도 | 모델 | 형식 | 크기 | 라이선스 |
+| --- | --- | --- | --- | --- |
+| 🎙️ 음성 인식 | [Systran/faster-whisper-large-v3](https://huggingface.co/Systran/faster-whisper-large-v3) (OpenAI Whisper large-v3) | CTranslate2 | 3.1 GB | MIT |
+| 🧠 타임라인 정리 | [google/gemma-4-12B-it-qat-q4_0-gguf](https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf) (Gemma 4 12B Instruct, QAT) | GGUF q4_0 | 7.0 GB | Apache 2.0 |
+
+모델은 설치 파일에 들어 있지 않고, 첫 실행 때 Hugging Face 공식 저장소에서 받습니다.
+
+## 개발
+
+```powershell
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\python.exe -m soop_timeline --gui                                       # 화면
+.venv\Scripts\python.exe -m soop_timeline https://vod.sooplive.com/player/123456789   # 명령줄
+```
+
+저장소에 들어 있지 않은 것:
+- `vendor/llama.cpp/` — [llama.cpp 릴리스](https://github.com/ggml-org/llama.cpp/releases)의 Windows CUDA 빌드 (`llama-server.exe`와 DLL)
+- `vendor/ffmpeg/` — FFmpeg Windows 빌드 (`ffmpeg.exe`)
+- `models/` — 첫 실행 때 자동으로 받음
+- `soop_timeline/_private.py` — 댓글 서명에 숨기는 표식 문자 (위조를 막으려고 공개하지 않음). 없으면 표식 없이 동작합니다
+
+<details>
+<summary><b>폴더 구조</b></summary>
+
+```
+soop_timeline/
+  app.py            # pywebview 창 + JS API
+  pipeline.py       # 링크 → 타임라인 전체 과정
+  soop_api.py       # SOOP VOD·채팅·음성, 접근 제한 판단
+  highlights.py     # 채팅 급증 탐지
+  stt.py            # faster-whisper 받아쓰기
+  llm.py            # llama-server 실행 · JSON 추론
+  chapters.py       # 장면 나누기 · 제목
+  signature.py      # 댓글 머리말 · 별점줍 · 꼬리말
+  soop_account.py   # 로그인 · 댓글 업로드
+  control.py        # 일시정지 · 우선순위
+  models.py         # 모델 다운로드 (이어받기)
+  settings.py       # 설정 · 타임라인 파일 · 남은 시간 학습
+  web/              # 화면 (HTML / CSS / JS)
+packaging/          # PyInstaller spec, Inno Setup, build.ps1
+docs/images/        # README 이미지
+```
+</details>
+
+<details>
+<summary><b>배포용 빌드</b></summary>
+
+```powershell
+powershell -ExecutionPolicy Bypass -File packaging\build.ps1
+```
+
+PyInstaller → 개인정보 검사(분석 데이터·설정·로그인 파일, PC 사용자 이름과 `packaging\privacy_words.txt`의 문자열이 있으면 중단) → Inno Setup.
+결과는 `build\installer\TimeZoop_Setup_<버전>.exe`. 자가 진단: `TimeZoop.exe --selftest <VOD 링크>`.
+</details>
+
+## 개인정보
+
+- **아이디·비밀번호를 받지 않습니다.** 로그인은 SOOP 공식 로그인 페이지에서 직접 하고, 타임줍은 로그인 후 생긴 쿠키만 이 PC에 Windows DPAPI로 암호화해 둡니다. 로그아웃하면 바로 지워집니다.
+- **로그인 쿠키는 SOOP 서버(`*.sooplive.com`, `*.sooplive.co.kr`)로만 보냅니다.** 로그인 확인, 댓글 작성, 접근 제한 VOD를 받을 때만 씁니다. 코드는 [`soop_account.py`](soop_timeline/soop_account.py)에서 볼 수 있어요.
+- **방송 음성과 채팅은 외부 AI 서비스로 보내지 않습니다.** 사용 기록 수집·통계 전송도 없습니다.
+- 올린 댓글에는 꼬리말과 보이지 않는 표식 문자가 들어가지만, 개인정보는 들어가지 않습니다.
+
+## License
+
+[MIT](LICENSE)
+
+함께 배포되는 구성 요소: llama.cpp (MIT) · faster-whisper (MIT) · CTranslate2 (MIT) · FFmpeg (LGPL v3) · pywebview (BSD-3) · httpx (BSD-3) · NumPy (BSD-3) · Send2Trash (BSD-3) · NVIDIA cuBLAS (NVIDIA EULA) · Pretendard (SIL OFL 1.1).
+Whisper large-v3 (MIT), Gemma 4 (Apache 2.0) 모델은 첫 실행 때 Hugging Face에서 받습니다.
+
+<sub>타임줍은 SOOP과 관련 없는 개인 프로젝트입니다.</sub>

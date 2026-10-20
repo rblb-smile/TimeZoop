@@ -1,0 +1,26 @@
+# 개인 데이터 · 큰 파일 (공개 저장소에 올리지 않음)
+data/
+models/
+build/
+dist/
+.venv/
+packaging/privacy_words.txt
+
+# 동봉 실행 파일 (llama.cpp, FFmpeg) — 받는 방법은 README 참고
+vendor/
+
+# 공개하지 않는 값 (댓글 서명 표식) — 설치 파일에는 들어 있음. 모양은 _private_example.py
+soop_timeline/_private.py
+
+# Python
+__pycache__/
+*.py[cod]
+
+# 기타
+*.log
+*.m4a
+*.gguf
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
