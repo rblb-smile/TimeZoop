@@ -25,8 +25,8 @@ from . import __version__, settings
 from .paths import DATA_ROOT, FROZEN, MODELS_DIR, USER_ROOT
 
 # 진단 파일 내용 (화면 안내·README·사용설명서·설치안내와 같은 목록)
-DIAG_IN = ['타임줍 버전', 'PC 사양: Windows 버전, CPU, 메모리, 그래픽카드(이름·VRAM·드라이버), 남은 저장 공간', 'AI 모델 상태', '앱 설정: 화면 모드, 효과음, 타임라인 개수, 댓글 꾸미기, 남은 시간 계산값', '오류 기록: 앱 오류, 마지막으로 실패한 작업, 정리 AI 실행 기록, 자가 진단 기록 (실패한 다시보기 번호가 들어갈 수 있어요)']
-DIAG_OUT = ['SOOP 아이디·비밀번호, 로그인 정보(쿠키)', '업로드 기록, 타임라인·댓글 내용', '방송 음성, 채팅, 받아쓰기 내용', 'PC 사용자 이름과 SOOP 계정 이름 (기록에 있으면 <사용자>로 바꿔요)']
+DIAG_IN = ['타임줍 버전', 'PC 사양\nWindows 버전 · CPU · 메모리 · 그래픽카드(이름·VRAM·드라이버) · 남은 저장 공간', 'AI 모델 상태', '앱 설정\n화면 모드 · 효과음 · 타임라인 개수 · 댓글 꾸미기 · 남은 시간 계산값', '오류 기록\n앱 오류 · 마지막으로 실패한 작업 · 정리 AI 실행 기록 · 자가 진단 기록\n(실패한 다시보기 번호가 들어갈 수 있어요)']
+DIAG_OUT = ['SOOP 아이디·비밀번호, 로그인 정보(쿠키)', '업로드 기록, 타임라인·댓글 내용', '방송 음성, 채팅, 받아쓰기 내용', 'PC 사용자 이름과 SOOP 계정 이름\n(기록에 있으면 <사용자>로 바꿔요)']
 
 LOG_PATH = settings.APP_DIR / "app.log"
 LAST_ERROR_PATH = settings.APP_DIR / "last_error.json"
@@ -172,8 +172,8 @@ def export(target_dir: Path | None = None) -> Path:
         "selftest.log": _tail(USER_ROOT / "selftest.log", 400),
     }
     readme = ("타임줍 진단 정보입니다. 디스코드 🐞버그-제보 글에 이 파일을 그대로 올려 주세요.\n\n"
-              "[들어 있는 것]\n" + "".join(f"- {t}\n" for t in DIAG_IN) +
-              "\n[들어 있지 않은 것]\n" + "".join(f"- {t}\n" for t in DIAG_OUT) +
+              "[들어 있는 것]\n" + "".join("- " + t.replace("\n", "\n  ") + "\n" for t in DIAG_IN) +
+              "\n[들어 있지 않은 것]\n" + "".join("- " + t.replace("\n", "\n  ") + "\n" for t in DIAG_OUT) +
               "\n이 파일은 타임줍이 어디로도 자동으로 보내지 않습니다. 직접 올릴 때만 전달됩니다.\n")
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("읽어 주세요.txt", readme)

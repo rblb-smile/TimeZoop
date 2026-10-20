@@ -479,3 +479,7 @@ body.dock-open .tracker { bottom: 92px; }  /* 편집·미리보기 하단 버튼
 .diag-box.out b { color: var(--pink); }
 .diag-list { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.65; color: var(--text-2); }
 .modal .diag-box + p { margin-top: 12px; }
+.modal p { white-space: pre-line; }  /* 안내 문장의 줄바꿈(\n)을 그대로 */
+.diag-list li { margin-bottom: 4px; }
+.diag-list .diag-sub { display: block; font-size: 12px; color: var(--text-3); }
+.privacy span, .empty, .banner span, .count-note, #setupMsg { white-space: pre-line; }  /* 안내 문장의 줄바꿈 */

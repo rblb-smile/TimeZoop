@@ -8,24 +8,24 @@ const SIGN_HEAD = 45, SIGN_FOOT = 34, SIGN_STARS = 27, SIGN_MARK = 3;  // 별점
 // 진단 정보: 들어가는 것 / 들어가지 않는 것 (README·사용설명서·설치안내와 같은 목록)
 const DIAG_IN = [
   "타임줍 버전",
-  "PC 사양: Windows 버전, CPU, 메모리, 그래픽카드(이름·VRAM·드라이버), 남은 저장 공간",
+  "PC 사양\nWindows 버전 · CPU · 메모리 · 그래픽카드(이름·VRAM·드라이버) · 남은 저장 공간",
   "AI 모델 상태",
-  "앱 설정: 화면 모드, 효과음, 타임라인 개수, 댓글 꾸미기, 남은 시간 계산값",
-  "오류 기록: 앱 오류, 마지막으로 실패한 작업, 정리 AI 실행 기록, 자가 진단 기록 (실패한 다시보기 번호가 들어갈 수 있어요)",
+  "앱 설정\n화면 모드 · 효과음 · 타임라인 개수 · 댓글 꾸미기 · 남은 시간 계산값",
+  "오류 기록\n앱 오류 · 마지막으로 실패한 작업 · 정리 AI 실행 기록 · 자가 진단 기록\n(실패한 다시보기 번호가 들어갈 수 있어요)",
 ];
 const DIAG_OUT = [
   "SOOP 아이디·비밀번호, 로그인 정보(쿠키)",
   "업로드 기록, 타임라인·댓글 내용",
   "방송 음성, 채팅, 받아쓰기 내용",
-  "PC 사용자 이름과 SOOP 계정 이름 (기록에 있으면 <사용자>로 바꿔요)",
+  "PC 사용자 이름과 SOOP 계정 이름\n(기록에 있으면 <사용자>로 바꿔요)",
 ];
-const DIAG_SEND = "만든 파일은 어디로도 자동으로 보내지 않아요. 직접 디스코드에 올릴 때만 전달돼요.";
+const DIAG_SEND = "만든 파일은 어디로도 자동으로 보내지 않아요.\n직접 디스코드에 올릴 때만 전달돼요.";
 const STYLE_NAMES = { bracket: "낫표", angle: "괄호", pang: "팡!", dust: "별가루", star: "별하나", none: "없음" };
 const STYLE_MARKS = { bracket: "「 」", angle: "〈 〉", pang: "-ˏˋ ˎˊ-", dust: "⁺₊ ₊⁺", star: "⋆ ⋆", none: "" };
 const STARS_RE = /^(.*?)(\s+)(\S*\s?[✦✧]{5}.*)$/u;  // 줄 끝의 별점줍 (모양과 상관없이)
 const PRIVACY = "타임줍은 SOOP 아이디와 비밀번호를 수집하거나 저장하지 않습니다. " +
-  "로그인은 SOOP 공식 로그인 페이지에서 직접 진행되며, 프로그램은 로그인 후 발급되는 로그인 상태 정보(쿠키)만 " +
-  "이 PC에 암호화해 저장합니다. 이 정보는 댓글 업로드에만 쓰이며, 로그아웃하면 즉시 삭제됩니다.";
+  "로그인은 SOOP 공식 로그인 페이지에서 직접 진행되며, 프로그램은 로그인 후 발급되는 로그인 상태 정보(쿠키)만\n" +
+  "이 PC에 암호화해 저장합니다.\n이 정보는 댓글 업로드에만 쓰이며, 로그아웃하면 즉시 삭제됩니다.";
 
 function el(tag, props = {}, children = []) {
   const e = Object.assign(document.createElement(tag), props);
@@ -166,14 +166,18 @@ const app = {
   alert(title, msg) { return this.modal(title, msg, [["확인", true, "primary"]]); },
   // 실패 창: 확인 + 진단 정보 만들기 + 디스코드에 알리기 (디스코드는 열기만 하고, 내용은 사용자가 직접 올린다)
   async failAlert(title, msg) {
-    const body = [].concat(msg, "문제를 알려 주실 때 [진단 정보 만들기]로 만든 파일을 함께 올려 주시면 빨리 고칠 수 있어요.");
+    const body = [].concat(msg, "문제를 알려 주실 때 [진단 정보 만들기]로 만든 파일을\n함께 올려 주시면 빨리 고칠 수 있어요.");
     const r = await this.modal(title, body, [["진단 정보 만들기", "diag", "ghost"], ["디스코드에 알리기", "discord", "ghost"], ["확인", true, "primary"]]);
     if (r === "discord") api().open_feedback();
     if (r === "diag") this.exportDiagnostics();
   },
   async exportDiagnostics() {
     // 만들기 전에 무엇이 들어가고 무엇이 빠지는지 먼저 보여 준다
-    const list = (items) => el("ul", { className: "diag-list" }, items.map((t) => el("li", { textContent: t })));
+    // 항목마다 첫 줄은 이름, 다음 줄은 자세한 내용 (작게)
+    const list = (items) => el("ul", { className: "diag-list" }, items.map((t) => {
+      const [head, ...rest] = t.split("\n");
+      return el("li", {}, [head, ...rest.map((r) => el("span", { className: "diag-sub", textContent: r }))]);
+    }));
     const ok = await this.modal("진단 정보를 만들까요?", [
       "문제를 알려 주실 때 올릴 파일(zip)을 바탕화면에 만들어요.",
       el("div", { className: "diag-box in" }, [el("b", { textContent: "들어가는 것" }), list(DIAG_IN)]),
@@ -184,9 +188,10 @@ const app = {
     const r = await api().export_diagnostics();
     if (!r.ok) return this.alert("진단 정보를 만들지 못했어요", r.error);
     const go = await this.modal("진단 정보를 만들었어요", [
-      `바탕화면에 ${r.name} 파일을 만들었어요. 탐색기 창에서 바로 보여 드릴게요.`,
-      "디스코드 🐞버그-제보에 글을 쓰고 이 파일을 끌어다 놓아 주세요. 어떤 상황에서 문제가 생겼는지 한 줄만 적어 주시면 충분해요.",
-      "로그인 정보, 비밀번호, 업로드 기록, 타임라인 내용은 들어 있지 않고, PC 사용자 이름은 <사용자>로 바꿨어요. " + DIAG_SEND,
+      `바탕화면에 ${r.name} 파일을 만들었어요.\n탐색기 창에서 바로 보여 드릴게요.`,
+      "디스코드 🐞버그-제보에 글을 쓰고 이 파일을 끌어다 놓아 주세요.\n어떤 상황에서 문제가 생겼는지 한 줄만 적어 주시면 충분해요.",
+      "로그인 정보, 비밀번호, 업로드 기록, 타임라인 내용은 들어 있지 않고,\nPC 사용자 이름은 <사용자>로 바꿨어요.",
+      DIAG_SEND,
     ], [["닫기", false, "ghost"], ["디스코드 열기", true, "primary"]]);
     if (go) api().open_feedback();
   },
@@ -252,7 +257,7 @@ const app = {
     );
     $("btnSetupStart").disabled = !enough;
     if (st.need_bytes < st.total_bytes) $("btnSetupStart").lastChild.textContent = "이어서 받기";
-    $("setupMsg").textContent = enough ? "받을 준비가 됐어요" : `저장 공간이 부족해요. ${fmtBytes(st.need_bytes + 2e9)} 이상 비워 주세요.`;
+    $("setupMsg").textContent = enough ? "받을 준비가 됐어요" : `저장 공간이 부족해요.\n${fmtBytes(st.need_bytes + 2e9)} 이상 비워 주세요.`;
     this.setupSpeed = null;
     this.show("viewSetup");
   },
@@ -461,7 +466,7 @@ const app = {
     $("selCount").textContent = `${this.selected.size}개 선택`;
     $("btnDeleteSel").disabled = !this.selected.size;
     if (!this.works.length) {
-      box.replaceChildren(el("div", { className: "empty", textContent: "아직 만든 타임라인이 없어요. 위에 다시보기 링크를 넣어 시작해 보세요." }));
+      box.replaceChildren(el("div", { className: "empty", textContent: "아직 만든 타임라인이 없어요.\n위에 다시보기 링크를 넣어 시작해 보세요." }));
       return;
     }
     box.replaceChildren(...this.works.map((w) => {
@@ -508,7 +513,7 @@ const app = {
         el("dt", { textContent: "모두 삭제" }), el("dd", { textContent: `분석 데이터 ${fmtBytes(bytes)} + 타임라인 파일 ${withTimeline}개 → 목록에서 사라져요` }),
         el("dt", { textContent: "데이터만 비우기" }), el("dd", { textContent: `분석 데이터 ${fmtBytes(bytes)}만 지우고 타임라인 파일은 남겨요` }),
       ]),
-      el("div", { className: "privacy" }, [icon("info"), el("span", { textContent: "타임라인 파일은 휴지통으로 옮겨져서 되살릴 수 있어요. 분석 데이터(음성·채팅·대본)는 바로 삭제되고, 다시 분석하면 새로 받아요." })]),
+      el("div", { className: "privacy" }, [icon("info"), el("span", { textContent: "타임라인 파일은 휴지통으로 옮겨져서 되살릴 수 있어요.\n분석 데이터(음성·채팅·대본)는 바로 삭제되고, 다시 분석하면 새로 받아요." })]),
     ];
     if (busy) body.push(el("div", { className: "banner warn" }, [icon("info", "i"), el("span", { textContent: "지금 분석 중인 VOD는 빼고 삭제해요." })]));
     const actions = [["취소", null, "ghost"]];
@@ -528,7 +533,7 @@ const app = {
     if (r.failed.length) {
       // 실패한 항목을 이름으로 보여 주고 바로 다시 시도할 수 있게
       const retry = await this.modal("일부를 삭제하지 못했어요", [
-        `${r.deleted}개는 삭제했고, ${r.failed.length}개는 지우지 못했어요. 다른 프로그램(파일 탐색기, 백신 등)이 파일을 잠깐 쓰고 있었을 수 있어요.`,
+        `${r.deleted}개는 삭제했고, ${r.failed.length}개는 지우지 못했어요.\n다른 프로그램(파일 탐색기, 백신 등)이 파일을 잠깐 쓰고 있었을 수 있어요.`,
         el("div", { className: "path", textContent: r.failed.map(titleOf).join("\n") }),
       ], [["닫기", false, "ghost"], ["다시 시도", true, "danger-fill"]]);
       if (retry) return this.runDelete(r.failed, keepTimeline);
@@ -583,7 +588,7 @@ const app = {
       el("span", { className: "tilde", textContent: "~" }),
       el("span", { textContent: "최대" }), maxIn, el("span", { textContent: "개" }),
     ]);
-    const rangeNote = el("p", { className: "count-note", textContent: "비워 두면 방송 길이와 채팅 반응을 보고 딱 알맞은 개수로 정리해 드려요. 숫자는 하나만 넣어도 돼요." });
+    const rangeNote = el("p", { className: "count-note", textContent: "비워 두면 방송 길이와 채팅 반응을 보고 딱 알맞은 개수로 정리해 드려요.\n숫자는 하나만 넣어도 돼요." });
     const amountRow = el("div", { className: "amount-row" }, [
       el("div", { className: "amount-top" }, [el("b", { textContent: "타임라인 개수" }), seg, hint]),
       range, rangeNote,
@@ -625,7 +630,7 @@ const app = {
     const card = el("div", { className: "vod-card" }, [thumb, el("h4", { textContent: v.title }), meta]);
     if (v.saved) {
       card.append(el("div", { className: "banner info" }, [icon("info", "i"), el("span", {
-        textContent: "이 VOD로 만든 타임라인이 있어요. [불러오기]로 이어서 고치거나, [새로 분석]으로 다시 만들 수 있어요. 새로 분석하면 저장된 파일이 새 결과로 바뀌어요.",
+        textContent: "이 VOD로 만든 타임라인이 있어요.\n[불러오기]로 이어서 고치거나, [새로 분석]으로 다시 만들 수 있어요.\n새로 분석하면 저장된 파일이 새 결과로 바뀌어요.",
       })]));
     }
     return card;
@@ -789,7 +794,7 @@ const app = {
   // ---------- 미리보기 · 업로드 ----------
   async done() {
     const bad = $("rows").querySelector("input.bad");
-    if (bad) { bad.focus(); return this.alert("시각을 확인해 주세요", "빨간 칸의 시각 형식이 맞지 않아요. 00:00:00 형식으로 적어 주세요."); }
+    if (bad) { bad.focus(); return this.alert("시각을 확인해 주세요", "빨간 칸의 시각 형식이 맞지 않아요.\n00:00:00 형식으로 적어 주세요."); }
     await this.saveNow();
     const text = this.currentText();
     if (!text) return this.alert("내용이 없어요", "타임라인에 한 줄 이상 적어 주세요.");
@@ -797,7 +802,7 @@ const app = {
     this.parts = parts;
     const banner = $("splitBanner");
     banner.classList.toggle("hidden", parts.length < 2);
-    banner.lastElementChild.textContent = `타임라인이 ${text.length.toLocaleString()}자로 5,000자를 초과해요. 댓글 ${parts.length}개로 나눠서 작성합니다.`;
+    banner.lastElementChild.textContent = `타임라인이 ${text.length.toLocaleString()}자로 5,000자를 초과해요.\n댓글 ${parts.length}개로 나눠서 작성합니다.`;
     const st = await api().login_status();
     const nick = st.logged_in ? st.nick : "내 계정";
     $("previewParts").replaceChildren(...parts.map((p, i) => el("div", { className: "comment" }, [
@@ -840,7 +845,7 @@ const app = {
     const st = await api().upload_check();
     if (st.logged_in) return st;
     const go = await this.modal("SOOP 로그인이 필요해요",
-      ["댓글을 올리려면 SOOP 계정으로 로그인해야 해요. SOOP 공식 로그인 창이 열립니다.", this.privacyBox()],
+      ["댓글을 올리려면 SOOP 계정으로 로그인해야 해요.\nSOOP 공식 로그인 창이 열립니다.", this.privacyBox()],
       [["취소", false, "ghost"], ["로그인", true, "primary"]]);
     if (!go) return null;
     const logged = await new Promise((resolve) => { this.loginWaiter = resolve; api().login(); });
@@ -853,7 +858,7 @@ const app = {
     const n = this.parts.length;
     const body = [`${st.nick} (${st.id}) 계정으로 이 다시보기에 댓글 ${n}개를 올립니다.`];
     if (n > 1) body.push(el("div", { className: "banner warn" }, [icon("info", "i"), el("span", { textContent: `타임라인이 5,000자를 초과해서 댓글 ${n}개로 나눠 작성해요.` })]));
-    if (st.uploaded_before) body.push(el("div", { className: "banner warn" }, [icon("info", "i"), el("span", { textContent: `이 VOD에는 ${st.uploaded_before.time}에 ${st.uploaded_before.nick} 계정으로 올린 기록이 있어요. 다시 올리면 댓글이 중복돼요.` })]));
+    if (st.uploaded_before) body.push(el("div", { className: "banner warn" }, [icon("info", "i"), el("span", { textContent: `이 VOD에는 ${st.uploaded_before.time}에 ${st.uploaded_before.nick} 계정으로 올린 기록이 있어요.\n다시 올리면 댓글이 중복돼요.` })]));
     const ok = await this.modal("댓글을 올릴까요?", body, [["취소", false, "ghost"], ["올리기", true, "primary"]]);
     if (!ok) return;
     const btn = $("btnUpload");

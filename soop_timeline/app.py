@@ -27,12 +27,12 @@ WEEKDAYS = "월화수목금토일"
 def _access_detail(kind: str, status: str = "") -> str:
     """제한 종류별 안내 (AccessRequired.kind, 연령 제한이면 SOOP의 adult_status)."""
     if kind == "adult" and status == "notCert":  # 로그인은 됐지만 성인 인증을 안 한 계정
-        return "19세 이상만 볼 수 있는 다시보기예요. 이 계정은 아직 성인 인증을 하지 않았어요. SOOP에서 성인 인증을 마치면 볼 수 있어요."
+        return "19세 이상만 볼 수 있는 다시보기예요.\n이 계정은 아직 성인 인증을 하지 않았어요.\nSOOP에서 성인 인증을 마치면 볼 수 있어요."
     if kind == "adult" and status == "notRealName":  # 실명 인증이 안 된 계정
-        return "19세 이상만 볼 수 있는 다시보기예요. 이 계정은 아직 실명 인증을 하지 않았어요. SOOP에서 본인 인증을 마치면 볼 수 있어요."
+        return "19세 이상만 볼 수 있는 다시보기예요.\n이 계정은 아직 실명 인증을 하지 않았어요.\nSOOP에서 본인 인증을 마치면 볼 수 있어요."
     return {
-        "adult": "19세 이상만 볼 수 있는 다시보기예요. 성인 인증을 마친 SOOP 계정이 필요해요.",
-        "subscribe": "구독자 전용 다시보기예요. 이 방송인을 구독한(필요하면 해당 등급) 계정이 필요해요.",
+        "adult": "19세 이상만 볼 수 있는 다시보기예요.\n성인 인증을 마친 SOOP 계정이 필요해요.",
+        "subscribe": "구독자 전용 다시보기예요.\n이 방송인을 구독한(필요하면 해당 등급) 계정이 필요해요.",
         "ppv": "구매해야 볼 수 있는 다시보기예요. 구매한 SOOP 계정이 필요해요.",
     }.get(kind, "볼 수 있는 권한이 있는 SOOP 계정이 필요해요.")
 
@@ -124,7 +124,7 @@ class Api:
                 self._emit("setup_error", message="받기를 멈췄어요. 다시 누르면 받던 곳부터 이어서 받아요.", cancelled=True)
             except Exception as e:
                 diagnostics.log_error("모델 받기", e)
-                self._emit("setup_error", message=f"모델을 받지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요. 받던 곳부터 이어서 받아요. ({e})")
+                self._emit("setup_error", message=f"모델을 받지 못했어요.\n인터넷 연결을 확인하고 다시 시도해 주세요.\n받던 곳부터 이어서 받아요.\n({e})")
             finally:
                 self._downloading = False
 
@@ -165,7 +165,7 @@ class Api:
         except Exception as e:  # 인터넷 문제 등: 받아 둔 정보가 있으면 그것으로
             meta = pipeline.DATA_ROOT / str(title_no) / "meta.json"
             if not meta.exists():
-                return {"ok": False, "error": f"다시보기 정보를 가져오지 못했어요. 인터넷 연결을 확인해 주세요. ({e.__class__.__name__})"}
+                return {"ok": False, "error": f"다시보기 정보를 가져오지 못했어요.\n인터넷 연결을 확인해 주세요.\n({e.__class__.__name__})"}
             vod = VodInfo.from_json(json.loads(meta.read_text(encoding="utf-8")))
         self._vods[title_no] = vod
         saved = settings.load_timeline(title_no)
