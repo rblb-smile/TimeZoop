@@ -27,7 +27,7 @@ BLOCK = 300.0
 DENSITY = {
     "many": {"min_len": 600.0, "busy": 1.3, "z": 1.8, "hl_gap": 150.0, "merge_gap": 75.0},
     "normal": {"min_len": 900.0, "busy": 1.6, "z": 2.0, "hl_gap": 180.0, "merge_gap": 90.0},
-    "few": {"min_len": 1500.0, "busy": 2.0, "z": 2.4, "hl_gap": 240.0, "merge_gap": 120.0},
+    "few": {"min_len": 1125.0, "busy": 1.72, "z": 2.2, "hl_gap": 210.0, "merge_gap": 105.0},
 }
 DEFAULT_DENSITY = "normal"
 
