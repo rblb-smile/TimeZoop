@@ -66,5 +66,11 @@ def child_flags() -> int:
 def lower_priority() -> None:
     """이 프로세스(음성 인식이 도는 곳)의 우선순위를 낮춘다. 화면은 별도 WebView 프로세스라 영향이 없다."""
     if sys.platform == "win32":
+        from ctypes import wintypes
+
         k32 = ctypes.windll.kernel32
+        # 64비트에서 핸들이 int로 잘리면 호출이 조용히 실패하므로 형식을 지정한다
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        k32.SetPriorityClass.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        k32.SetPriorityClass.restype = wintypes.BOOL
         k32.SetPriorityClass(k32.GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS)
