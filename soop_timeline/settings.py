@@ -47,6 +47,16 @@ def load() -> dict:
         return {}
 
 
+def speed() -> str:
+    """작업 속도: fast(정리 AI 질문 2개씩) / slow(1개씩).
+    고르지 않았으면 그래픽카드 메모리가 11GB 이상(12GB급)일 때만 fast."""
+    chosen = load().get("speed")
+    if chosen in ("fast", "slow"):
+        return chosen
+    from .control import vram_mb
+    return "fast" if vram_mb() >= 11000 else "slow"
+
+
 def save(data: dict) -> None:
     APP_DIR.mkdir(parents=True, exist_ok=True)
     SETTINGS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -371,7 +371,15 @@ class Api:
 
     def get_settings(self) -> dict:
         data = settings.load()
-        return {"save_dir": str(settings.save_dir()), "theme": data.get("theme", "system"), "sound": data.get("sound", True)}
+        return {"save_dir": str(settings.save_dir()), "theme": data.get("theme", "system"), "sound": data.get("sound", True),
+                "speed": settings.speed(), "speed_chosen": data.get("speed") in ("fast", "slow"),
+                "vram_gb": round(control.vram_mb() / 1024)}
+
+    def set_speed(self, speed: str) -> dict:
+        data = settings.load()
+        data["speed"] = speed if speed in ("fast", "slow") else "slow"
+        settings.save(data)
+        return {"ok": True}
 
     def set_sound(self, enabled: bool) -> dict:
         data = settings.load()

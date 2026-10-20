@@ -10,7 +10,7 @@ const DIAG_IN = [
   "타임줍 버전",
   "PC 사양\nWindows 버전 · CPU · 메모리 · 그래픽카드(이름·VRAM·드라이버) · 남은 저장 공간",
   "AI 모델 상태",
-  "앱 설정\n화면 모드 · 효과음 · 타임라인 개수 · 댓글 꾸미기 · 남은 시간 계산값",
+  "앱 설정\n화면 모드 · 효과음 · 작업 속도 · 타임라인 개수 · 댓글 꾸미기 · 남은 시간 계산값",
   "오류 기록\n앱 오류 · 마지막으로 실패한 작업 · 정리 AI 실행 기록 · 자가 진단 기록\n(실패한 다시보기 번호가 들어갈 수 있어요)",
 ];
 const DIAG_OUT = [
@@ -23,9 +23,9 @@ const DIAG_SEND = "만든 파일은 어디로도 자동으로 보내지 않아�
 const STYLE_NAMES = { bracket: "낫표", angle: "괄호", pang: "팡!", dust: "별가루", star: "별하나", none: "없음" };
 const STYLE_MARKS = { bracket: "「 」", angle: "〈 〉", pang: "-ˏˋ ˎˊ-", dust: "⁺₊ ₊⁺", star: "⋆ ⋆", none: "" };
 const STARS_RE = /^(.*?)(\s+)(\S*\s?[✦✧]{5}.*)$/u;  // 줄 끝의 별점줍 (모양과 상관없이)
-const PRIVACY = "타임줍은 SOOP 아이디와 비밀번호를 수집하거나 저장하지 않습니다. " +
-  "로그인은 SOOP 공식 로그인 페이지에서 직접 진행되며, 프로그램은 로그인 후 발급되는 로그인 상태 정보(쿠키)만\n" +
-  "이 PC에 암호화해 저장합니다.\n이 정보는 댓글 업로드에만 쓰이며, 로그아웃하면 즉시 삭제됩니다.";
+const PRIVACY = "타임줍은 SOOP 아이디와 비밀번호를 수집하거나 저장하지 않습니다.\n" +
+  "로그인은 SOOP 공식 로그인 페이지에서 직접 진행되며, 프로그램은 로그인 후 발급되는 로그인 상태 정보(쿠키)만 이 PC에 암호화해 저장합니다.\n" +
+  "이 정보는 댓글 업로드에만 쓰이며, 로그아웃하면 즉시 삭제됩니다.";
 
 function el(tag, props = {}, children = []) {
   const e = Object.assign(document.createElement(tag), props);
@@ -937,9 +937,24 @@ const app = {
       };
       return b;
     }));
+    // 작업 속도: 높은 속도 = 정리 AI 질문 2개씩 (그래픽카드 메모리를 더 씀)
+    const speed = el("div", { className: "segmented" }, [["fast", "높은 속도"], ["slow", "낮은 속도"]].map(([value, label]) => {
+      const b = el("button", { textContent: label, className: s.speed === value ? "on" : "" });
+      b.onclick = async () => {
+        speed.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+        await api().set_speed(value);
+      };
+      return b;
+    }));
+    const vram = s.vram_gb ? `이 PC 그래픽카드 메모리: ${s.vram_gb}GB` : "그래픽카드 메모리를 확인하지 못했어요";
+    const speedHint = el("p", { className: "count-note", textContent:
+      "높은 속도를 쓸수록 그래픽카드 메모리(VRAM)와 자원을 더 많이 써요.\n" +
+      "그래픽카드 메모리가 12GB보다 작거나, 분석 중에 PC가 버벅이면 낮은 속도를 골라 주세요.\n" +
+      vram + (s.speed_chosen ? "" : " · 처음에는 이 PC에 맞춰 골라 두었어요") });
     await this.modal("설정", [
       el("div", { className: "field" }, [el("label", { textContent: "화면 모드" }), seg]),
       el("div", { className: "field" }, [el("label", { textContent: "버튼 효과음" }), sound]),
+      el("div", { className: "field" }, [el("label", { textContent: "작업 속도" }), speed, speedHint]),
       el("div", { className: "field" }, [el("label", { textContent: "타임라인 저장 폴더" }), pathBox, el("div", { className: "row", style: "margin-top:8px" }, [btnChange, btnOpen])]),
       el("div", { className: "field" }, [el("label", { textContent: "SOOP 로그인" }), loginText, el("div", { className: "row" }, [btnLogin])]),
       el("div", { className: "field" }, [el("label", { textContent: "피드백 · 버그 제보" }),

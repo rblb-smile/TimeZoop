@@ -296,6 +296,8 @@ def make_timeline(
 
     blocks = build_blocks(vod, segments, events)
     kwargs = {"model": model} if model else {}
+    from .settings import speed
+    kwargs["parallel"] = 2 if speed() == "fast" else 1  # 낮은 속도: 그래픽카드 메모리를 덜 쓴다
     if progress:
         progress("정리 AI를 불러오고 있어요", 0.0)
     with LocalLLM(**kwargs) as llm:

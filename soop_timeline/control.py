@@ -56,6 +56,22 @@ def threads() -> int:
     return max(2, (os.cpu_count() or 4) // 2)
 
 
+_vram: int | None = None
+
+
+def vram_mb() -> int:
+    """그래픽카드 전체 메모리(MB). 모르면 0."""
+    global _vram
+    if _vram is None:
+        try:
+            r = subprocess.run(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
+                               capture_output=True, text=True, timeout=10, creationflags=child_flags())
+            _vram = max(int(x) for x in r.stdout.split())
+        except Exception:
+            _vram = 0
+    return _vram
+
+
 def child_flags() -> int:
     """자식 프로세스를 창 없이, 낮은 우선순위로 띄운다."""
     if sys.platform != "win32":
