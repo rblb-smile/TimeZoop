@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import threading
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
@@ -237,40 +239,48 @@ def _parse_chat_xml(xml_text: str, offset: float) -> list[ChatEvent]:
     return events
 
 
+CHAT_WORKERS = 4  # 채팅 다시보기 5분 묶음을 동시에 받는 수 (SOOP 서버에 무리가 가지 않을 만큼)
+
+
 def fetch_chat(vod: VodInfo, cache_dir: Path, client: httpx.Client | None = None, progress=None) -> list[ChatEvent]:
     """모든 파일의 채팅 다시보기를 받아 시간순으로 합친다. 원본 XML은 캐시한다."""
     own = client is None
     client = client or _client()
     raw_dir = cache_dir / "chat_raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
+    # 받을 5분 묶음 목록 (파일 순서, 시각 순서)
+    chunks = [(f, start) for f in vod.files if f.chat_url for start in range(0, int(f.duration) + 1, vod.chat_chunk)]
+    done, lock = 0, threading.Lock()
+
+    def get(chunk) -> str:
+        nonlocal done
+        f, start = chunk
+        path = raw_dir / f"{f.key}_{start}.xml"
+        if path.exists():
+            text = path.read_text(encoding="utf-8")
+        else:
+            # params= 를 쓰면 chat_url에 있던 rowKey가 사라지므로 직접 붙인다
+            r = client.get(f"{f.chat_url}&startTime={start}")
+            if r.status_code == 404:
+                # SOOP에 중간의 5분 묶음 하나만 없는 경우가 실제로 있다.
+                # 채팅 몇 분이 빠져도 음성 인식이 있으니 빈 묶음으로 보고 계속한다.
+                text = ""
+            else:
+                r.raise_for_status()
+                text = r.text
+            path.write_text(text, encoding="utf-8")
+        if progress:
+            with lock:
+                done += 1
+                progress(done, len(chunks))
+        return text
+
     events: list[ChatEvent] = []
     try:
-        total = sum(int(f.duration // vod.chat_chunk) + 1 for f in vod.files if f.chat_url)
-        done = 0
-        for f in vod.files:
-            if not f.chat_url:
-                continue
-            start = 0
-            while start <= f.duration:
-                path = raw_dir / f"{f.key}_{start}.xml"
-                if path.exists():
-                    text = path.read_text(encoding="utf-8")
-                else:
-                    # params= 를 쓰면 chat_url에 있던 rowKey가 사라지므로 직접 붙인다
-                    r = client.get(f"{f.chat_url}&startTime={start}")
-                    if r.status_code == 404:
-                        # SOOP에 중간의 5분 묶음 하나만 없는 경우가 실제로 있다.
-                        # 채팅 몇 분이 빠져도 음성 인식이 있으니 빈 묶음으로 보고 계속한다.
-                        text = ""
-                    else:
-                        r.raise_for_status()
-                        text = r.text
-                    path.write_text(text, encoding="utf-8")
+        # 4개씩 동시에 받고, 합치는 것은 원래 순서대로 (결과는 차례로 받을 때와 같다)
+        with ThreadPoolExecutor(CHAT_WORKERS) as ex:
+            for (f, _), text in zip(chunks, ex.map(get, chunks)):
                 events.extend(_parse_chat_xml(text, f.offset))
-                start += vod.chat_chunk
-                done += 1
-                if progress:
-                    progress(done, total)
     finally:
         if own:
             client.close()

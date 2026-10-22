@@ -13,6 +13,7 @@ SOOP에 올라간 뒤 작성자가 직접 고치는 것까지는 막을 수 없�
 from __future__ import annotations
 
 import re
+from bisect import bisect_left
 from pathlib import Path
 
 from .highlights import REACTIONS, find_bots
@@ -76,23 +77,40 @@ def load_chat(cache_dir: Path, vod: VodInfo) -> list[ChatEvent]:
     return events
 
 
+_WEIGHTS: dict = {}
+
+
+def _weights(events: list[ChatEvent]) -> tuple[list[float], list[float], list[float], list[float]]:
+    """채팅·별풍선 하나하나의 반응 점수 (시각순). 장면과 상관없어 한 번만 계산하고,
+    편집하면서 여러 번 부르는 같은 채팅 목록이면 다시 쓴다 (봇 계정 판별과 정규식 검사가 무겁다)."""
+    key = (id(events), len(events))
+    if key not in _WEIGHTS:
+        bots = find_bots(events)
+        chats = sorted((e for e in events if e.kind == "chat" and e.user not in bots), key=lambda e: e.t)
+        balloons = sorted((e for e in events if e.kind == "balloon"), key=lambda e: e.t)
+        _WEIGHTS.clear()  # 지금 연 방송 하나만 기억한다
+        _WEIGHTS[key] = (
+            [e.t for e in chats], [1 + 0.6 * sum(bool(rx.search(e.text)) for rx in REACTIONS.values()) for e in chats],
+            [e.t for e in balloons], [min(e.amount, 100) / 20 for e in balloons],
+        )
+    return _WEIGHTS[key]
+
+
 def scores(times: list[float], events: list[ChatEvent], duration: float) -> list[float]:
     """장면마다 분당 반응 점수. 시작부터 다음 장면까지(최소 1분, 최대 10분) 채팅 1점 + 반응 채팅 0.6점씩 + 별풍선(최대 5점)."""
     order = sorted(range(len(times)), key=lambda i: times[i])
-    bots = find_bots(events)
-    chats = [e for e in events if e.kind == "chat" and e.user not in bots]
+    chat_t, chat_w, ball_t, ball_w = _weights(events)
     out = [0.0] * len(times)
     for k, i in enumerate(order):
         start = times[i]
         nxt = times[order[k + 1]] if k + 1 < len(order) else duration
         end = min(max(nxt, start + 60), start + 600)
+        # 장면 구간에 든 채팅만 시각으로 잘라 더한다 (더하는 순서는 예전과 같아서 결과도 같다)
         s = 0.0
-        for e in chats:
-            if start <= e.t < end:
-                s += 1 + 0.6 * sum(bool(rx.search(e.text)) for rx in REACTIONS.values())
-        for e in events:
-            if e.kind == "balloon" and start <= e.t < end:
-                s += min(e.amount, 100) / 20
+        for w in chat_w[bisect_left(chat_t, start):bisect_left(chat_t, end)]:
+            s += w
+        for w in ball_w[bisect_left(ball_t, start):bisect_left(ball_t, end)]:
+            s += w
         out[i] = s / ((end - start) / 60)
     return out
 

@@ -198,12 +198,7 @@ class Api:
             return {"ok": False, "error": "이미 분석 중입니다"}
         from .chapters import DENSITY, TONES
 
-        data = settings.load()
-        if amount in DENSITY:
-            data["amount"] = amount
-        if tone in TONES:
-            data["tone"] = tone
-        settings.save(data)
+        settings.update(**{k: v for k, v, ok in (("amount", amount, amount in DENSITY), ("tone", tone, tone in TONES)) if ok})
         self._busy = True
         self._busy_title_no = parse_vod_id(link)
         def num(v):
@@ -345,10 +340,7 @@ class Api:
     def set_sign(self, opts: dict) -> dict:
         from . import signature
 
-        data = settings.load()
-        data["sign"] = signature.options(opts)
-        settings.save(data)
-        return {"ok": True, "options": data["sign"]}
+        return {"ok": True, "options": settings.update(sign=signature.options(opts))["sign"]}
 
     def copy_text(self, text: str) -> dict:
         """클립보드에 복사 (화면 쪽 복사가 막혀 있을 때 쓰는 예비 경로)."""
@@ -380,21 +372,15 @@ class Api:
                 "vram_gb": round(control.vram_mb() / 1024)}
 
     def set_speed(self, speed: str) -> dict:
-        data = settings.load()
-        data["speed"] = speed if speed in ("fast", "slow") else "slow"
-        settings.save(data)
+        settings.update(speed=speed if speed in ("fast", "slow") else "slow")
         return {"ok": True}
 
     def set_sound(self, enabled: bool) -> dict:
-        data = settings.load()
-        data["sound"] = bool(enabled)
-        settings.save(data)
+        settings.update(sound=bool(enabled))
         return {"ok": True}
 
     def set_theme(self, theme: str) -> dict:
-        data = settings.load()
-        data["theme"] = theme if theme in ("system", "light", "dark") else "system"
-        settings.save(data)
+        settings.update(theme=theme if theme in ("system", "light", "dark") else "system")
         return {"ok": True}
 
     def works(self) -> dict:
@@ -490,14 +476,40 @@ class Api:
         return {"ok": True, **user}
 
 
+def _clear_stale_web_cache(storage: Path) -> None:
+    """화면 파일이 바뀌었으면(업데이트 설치) WebView2가 들고 있는 예전 화면 캐시를 지운다.
+    지우지 않으면 새 버전을 설치해도 예전 app.js·style.css가 그대로 보일 수 있다. 로그인·설정은 건드리지 않는다."""
+    import hashlib
+    import shutil
+
+    stamp = hashlib.sha1("|".join(
+        f"{p.name}:{p.stat().st_size}:{int(p.stat().st_mtime)}" for p in sorted(WEB_DIR.rglob("*")) if p.is_file()
+    ).encode()).hexdigest()[:16]
+    mark = storage / "web_stamp.txt"
+    try:
+        if mark.read_text(encoding="utf-8") == stamp:
+            return
+    except OSError:
+        pass
+    for name in ("Cache", "Code Cache", "GPUCache"):
+        shutil.rmtree(storage / "EBWebView" / "Default" / name, ignore_errors=True)
+    try:
+        storage.mkdir(parents=True, exist_ok=True)
+        mark.write_text(stamp, encoding="utf-8")
+    except OSError:
+        pass
+
+
 def main() -> None:
     api = Api()
+    storage = settings.APP_DIR / "webview"
+    _clear_stale_web_cache(storage)
     window = webview.create_window(
         "타임줍", str(WEB_DIR / "index.html"), js_api=api, width=1100, height=820, min_size=(760, 600)
     )
     api._window = window
     # 로그인 쿠키를 프로그램 전용 폴더에 두어, 다시 켜도 WebView 쪽 로그인도 유지되게 한다
-    webview.start(private_mode=False, storage_path=str(settings.APP_DIR / "webview"))
+    webview.start(private_mode=False, storage_path=str(storage))
 
 
 if __name__ == "__main__":

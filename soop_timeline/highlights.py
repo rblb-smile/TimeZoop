@@ -35,15 +35,15 @@ class Highlight:
     samples: list[str] = field(default_factory=list)  # 대표 채팅 (LLM 제목 생성용)
 
 
-def _rolling(x: np.ndarray, win: int, fn) -> np.ndarray:
-    half = win // 2
-    padded = np.pad(x, half, mode="edge")
-    return np.array([fn(padded[i : i + win]) for i in range(len(x))])
+def _rolling_median(x: np.ndarray, win: int) -> np.ndarray:
+    """가장자리는 끝값으로 채운 이동 중앙값 (창을 한꺼번에 만들어 numpy가 계산)."""
+    padded = np.pad(x, win // 2, mode="edge")
+    return np.median(np.lib.stride_tricks.sliding_window_view(padded, win)[: len(x)], axis=1)
 
 
 def _poisson_z(x: np.ndarray, baseline_win: int = 61) -> np.ndarray:
     smooth = np.convolve(x, np.ones(3) / 3, mode="same")
-    base = _rolling(smooth, baseline_win, np.median)
+    base = _rolling_median(smooth, baseline_win)
     return (smooth - base) / np.sqrt(base + 1.0)
 
 

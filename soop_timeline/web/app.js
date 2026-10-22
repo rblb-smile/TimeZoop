@@ -44,6 +44,21 @@ const PRIVACY = "타임줍은 SOOP 아이디와 비밀번호를 수집하거나 
   "로그인은 SOOP 공식 로그인 페이지에서 직접 진행되며, 프로그램은 로그인 후 발급되는 로그인 상태 정보(쿠키)만 이 PC에 암호화해 저장합니다.\n" +
   "이 정보는 댓글 업로드에만 쓰이며, 로그아웃하면 즉시 삭제됩니다.";
 
+// 버튼 여러 개 중 하나를 고르는 칸. items: [값, 이름, 설명?]. hint 칸을 주면 고른 것의 설명을 보여 준다
+function segmented(items, current, onPick, hint = null) {
+  const box = el("div", { className: "segmented" }, items.map(([value, label, desc]) => {
+    const b = el("button", { className: value === current ? "on" : "", textContent: label });
+    b.onclick = () => {
+      box.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+      if (hint) hint.textContent = desc;
+      onPick(value);
+    };
+    if (hint && value === current) hint.textContent = desc;
+    return b;
+  }));
+  return box;
+}
+
 function el(tag, props = {}, children = []) {
   const e = Object.assign(document.createElement(tag), props);
   e.append(...[].concat(children));
@@ -591,12 +606,7 @@ const app = {
     let amount = chk.amount || "normal";
     const amounts = [["few", "쪼끔만", "굵직한 장면만"], ["normal", "적당히", "보기 좋은 만큼 (추천)"], ["many", "많이많이", "주제가 바뀐 곳을 촘촘하게"]];
     const hint = el("span", { className: "amount-hint" });
-    const seg = el("div", { className: "segmented" }, amounts.map(([v, label, desc]) => {
-      const b = el("button", { className: v === amount ? "on" : "", textContent: label });
-      b.onclick = () => { amount = v; seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); hint.textContent = desc; };
-      if (v === amount) hint.textContent = desc;
-      return b;
-    }));
+    const seg = segmented(amounts, amount, (v) => { amount = v; }, hint);
     // 최소·최대 개수 (선택). 비우면 고른 개수 설정대로
     const num = (ph) => el("input", { type: "number", min: "1", max: "300", inputMode: "numeric", placeholder: ph, className: "count-input" });
     const minIn = num("예: 10"), maxIn = num("예: 30");
@@ -610,12 +620,7 @@ const app = {
     let tone = chk.tone || "clean";
     const tones = [["clean", "깔끔", "담백하게 내용 위주로"], ["friendly", "친근", "방송·커뮤니티 말투로"]];
     const toneHint = el("span", { className: "amount-hint" });
-    const toneSeg = el("div", { className: "segmented" }, tones.map(([v, label, desc]) => {
-      const b = el("button", { className: v === tone ? "on" : "", textContent: label });
-      b.onclick = () => { tone = v; toneSeg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); toneHint.textContent = desc; };
-      if (v === tone) toneHint.textContent = desc;
-      return b;
-    }));
+    const toneSeg = segmented(tones, tone, (v) => { tone = v; }, toneHint);
     const toneHelp = el("div", { className: "tone-help hidden" }, [
       el("p", { className: "count-note", textContent: "같은 방송을 두 말투로 정리하면 이렇게 올라가요." }),
       ...TONE_SAMPLES.map(([label, text]) => el("div", { className: "tone-sample" }, [
@@ -961,33 +966,11 @@ const app = {
       else api().login();
     };
     const themes = [["system", "시스템 설정"], ["light", "라이트"], ["dark", "다크"]];
-    const seg = el("div", { className: "segmented" }, themes.map(([value, label]) => {
-      const b = el("button", { textContent: label, className: (s.theme || "system") === value ? "on" : "" });
-      b.onclick = async () => {
-        seg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-        this.applyTheme(value);
-        await api().set_theme(value);
-      };
-      return b;
-    }));
-    const sound = el("div", { className: "segmented" }, [["on", "켜기"], ["off", "끄기"]].map(([value, label]) => {
-      const b = el("button", { textContent: label, className: (sfx.enabled ? "on" : "off") === value ? "on" : "" });
-      b.onclick = async () => {
-        sound.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-        sfx.enabled = value === "on";
-        await api().set_sound(sfx.enabled);
-      };
-      return b;
-    }));
+    const seg = segmented(themes, s.theme || "system", (value) => { this.applyTheme(value); api().set_theme(value); });
+    const sound = segmented([["on", "켜기"], ["off", "끄기"]], sfx.enabled ? "on" : "off",
+      (value) => { sfx.enabled = value === "on"; api().set_sound(sfx.enabled); });
     // 작업 속도: 높은 속도 = 정리 AI 질문 2개씩 (그래픽카드 메모리를 더 씀)
-    const speed = el("div", { className: "segmented" }, [["fast", "높은 속도"], ["slow", "낮은 속도"]].map(([value, label]) => {
-      const b = el("button", { textContent: label, className: s.speed === value ? "on" : "" });
-      b.onclick = async () => {
-        speed.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-        await api().set_speed(value);
-      };
-      return b;
-    }));
+    const speed = segmented([["fast", "높은 속도"], ["slow", "낮은 속도"]], s.speed, (value) => api().set_speed(value));
     const vram = s.vram_gb ? `이 PC 그래픽카드 메모리: ${s.vram_gb}GB` : "그래픽카드 메모리를 확인하지 못했어요";
     const speedHint = el("p", { className: "count-note", textContent:
       "높은 속도를 쓸수록 그래픽카드 메모리(VRAM)와 자원을 더 많이 써요.\n" +

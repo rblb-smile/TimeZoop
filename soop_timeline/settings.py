@@ -47,6 +47,14 @@ def load() -> dict:
         return {}
 
 
+def update(**values) -> dict:
+    """설정 몇 개만 바꿔 저장하고, 바뀐 전체 설정을 돌려준다."""
+    data = load()
+    data.update(values)
+    save(data)
+    return data
+
+
 def speed() -> str:
     """작업 속도: fast(정리 AI 질문 2개씩) / slow(1개씩).
     고르지 않았으면 그래픽카드 메모리가 11GB 이상(12GB급)일 때만 fast."""
