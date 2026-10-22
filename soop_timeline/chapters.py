@@ -286,14 +286,21 @@ _LAUGH = re.compile(r"\s*[ㅋㄷㅎ]{2,}[!?~]*\s*$")
 
 
 def _tame_laughs(entries: list[Entry]) -> list[Entry]:
-    """친근 말투: 'ㅋㅋ'·'ㄷㄷ'로 끝나는 제목이 지나치게 많을 때만 세 줄에 한 줄 정도로 줄인다."""
+    """친근 말투: 'ㅋㅋ'·'ㄷㄷ'로 끝나는 제목이 지나치게 많을 때만 세 줄에 한 줄 정도로 줄인다.
+    남길 줄은 앞에서부터가 아니라 타임라인 전체에 고르게 퍼지게 고른다 (위쪽에만 몰리지 않게)."""
+    order = sorted(range(len(entries)), key=lambda i: entries[i].t)
+    laughs = [k for k, i in enumerate(order) if _LAUGH.search(entries[i].title)]  # 시각순 위치
     allow = max(2, len(entries) // 3)
-    for e in entries:
-        if _LAUGH.search(e.title):
-            if allow > 0:
-                allow -= 1
-            else:
-                e.title = _LAUGH.sub("", e.title).rstrip() or e.title
+    if len(laughs) <= allow:
+        return entries
+    keep: set[int] = set()
+    for j in range(allow):  # 전체 줄을 allow 칸으로 나눠, 칸 가운데에 가장 가까운 'ㅋㅋ' 줄을 하나씩
+        target = (j + 0.5) * len(entries) / allow
+        keep.add(min((k for k in laughs if k not in keep), key=lambda k: abs(k - target)))
+    for k in laughs:
+        if k not in keep:
+            e = entries[order[k]]
+            e.title = _LAUGH.sub("", e.title).rstrip() or e.title
     return entries
 
 
