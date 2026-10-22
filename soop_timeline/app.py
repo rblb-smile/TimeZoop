@@ -189,11 +189,13 @@ class Api:
             },
             "amount": settings.load().get("amount") or "normal",
             "tone": settings.load().get("tone") or "clean",
+            "min_count": settings.load().get("min_count"),
+            "max_count": settings.load().get("max_count"),
         }
 
     def analyze(self, link: str, amount: str | None = None, min_count=None, max_count=None, tone: str | None = None) -> dict:
         """amount: 타임라인 개수 (many / normal / few), tone: 제목 말투 (clean / friendly). 고른 값은 다음 분석의 기본값으로 저장한다.
-        min_count / max_count: 이번 분석의 줄 수 범위 (선택, 저장하지 않는다)."""
+        min_count / max_count: 줄 수 범위 (선택). 이것도 다음 분석의 기본값으로 저장한다 (비우면 '알아서')."""
         if self._busy:
             return {"ok": False, "error": "이미 분석 중입니다"}
         from .chapters import DENSITY, TONES
@@ -211,6 +213,7 @@ class Api:
         lo, hi = num(min_count), num(max_count)
         if lo and hi and lo > hi:
             lo, hi = hi, lo
+        settings.update(min_count=lo, max_count=hi)
         threading.Thread(target=self._analyze, args=(link, settings.load().get("amount"), lo, hi, settings.load().get("tone")), daemon=True).start()
         return {"ok": True}
 

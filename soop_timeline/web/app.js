@@ -610,6 +610,8 @@ const app = {
     // 최소·최대 개수 (선택). 비우면 고른 개수 설정대로
     const num = (ph) => el("input", { type: "number", min: "1", max: "300", inputMode: "numeric", placeholder: ph, className: "count-input" });
     const minIn = num("예: 10"), maxIn = num("예: 30");
+    if (chk.min_count) minIn.value = chk.min_count;  // 지난번에 넣은 범위를 그대로 보여 준다
+    if (chk.max_count) maxIn.value = chk.max_count;
     const range = el("div", { className: "count-range" }, [
       el("span", { textContent: "최소" }), minIn, el("span", { textContent: "개" }),
       el("span", { className: "tilde", textContent: "~" }),
