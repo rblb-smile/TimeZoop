@@ -649,10 +649,28 @@ const app = {
       ? [["취소", null, "ghost"], ["새로 분석", "new"], ["불러오기", "open", "primary"]]
       : [["취소", null, "ghost"], ["이 VOD로 시작", "new", "primary"]], { wide: true });
     if (!choice) return;
-    if (choice === "open") return this.openSaved(String(chk.title_no));
     const toNum = (i) => { const v = parseInt(i.value, 10); return Number.isFinite(v) && v > 0 ? Math.min(v, 300) : null; };
     let minN = toNum(minIn), maxN = toNum(maxIn);
     if (minN && maxN && minN > maxN) [minN, maxN] = [maxN, minN];  // 거꾸로 넣었으면 바로잡는다
+    if (choice === "open") {
+      // 저장된 타임라인을 만든 설정과 지금 고른 설정이 다르면, 예전 결과를 그대로 띄우지 않고 새로 분석할지 묻는다
+      // (설정 기록이 없는 예전 타임라인은 이 창을 열 때 들어 있던 값과 비교한다)
+      const was = chk.saved_opts || { amount: chk.amount || "normal", tone: chk.tone || "clean", min_count: chk.min_count || null, max_count: chk.max_count || null };
+      const now = { amount, tone, min_count: minN, max_count: maxN };
+      const same = ["amount", "tone", "min_count", "max_count"].every((k) => (was[k] || null) === (now[k] || null));
+      if (same) return this.openSaved(String(chk.title_no));
+      const desc = (o) => [amounts.find(([v]) => v === o.amount)?.[1] || "적당히", o.tone === "friendly" ? "친근" : "깔끔",
+        o.min_count || o.max_count ? `${o.min_count || "?"}~${o.max_count || "?"}개` : ""].filter(Boolean).join(" · ");
+      // 받침에 맞춰 '으로/로' (받침 없음·ㄹ받침 → 로)
+      const ro = (w) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return c < 0 || c > 11171 || c % 28 === 0 || c % 28 === 8 ? "로" : "으로"; };
+      const go = await this.modal("설정이 바뀌었어요", [
+        `저장된 타임라인은 '${desc(was)}'${ro(desc(was))} 만들었어요.\n바꾼 설정 '${desc(now)}'${ro(desc(now))} 보려면 새로 분석해야 해요.`,
+        chk.cached && chk.cached.stt ? "받아 둔 음성과 받아쓰기를 다시 써서 처음보다 빨리 끝나요." : "",
+        "새로 분석하면 저장된 타임라인 파일이 새 결과로 바뀌어요.",
+      ].filter(Boolean), [["기존 결과 보기", "open", "ghost"], ["새로 분석", "new", "primary"]]);
+      if (go === "open") return this.openSaved(String(chk.title_no));
+      if (go !== "new") return;
+    }
     const r = await api().analyze(link, amount, minN, maxN, tone);
     if (!r.ok) return this.alert("시작하지 못했어요", r.error);
     $("btnAnalyze").disabled = true;

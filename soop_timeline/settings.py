@@ -16,6 +16,7 @@ from .timeline import Entry, fmt_time
 APP_DIR = Path(os.environ.get("APPDATA", Path.home())) / "TimeZoop"
 SETTINGS_PATH = APP_DIR / "settings.json"
 INDEX_PATH = APP_DIR / "timelines.json"  # VOD 번호 → 파일 이름 (사용자가 파일 이름에서 번호를 지워도 찾게)
+OPTIONS_PATH = APP_DIR / "analyzed.json"  # VOD 번호 → 그 타임라인을 만든 분석 설정 (개수·말투·최소·최대)
 DEFAULT_SAVE_DIR = Path.home() / "Documents" / "타임줍"
 
 # 예전 이름으로 만든 폴더 (timelineAI → 하이라인 → TimeJup → TimeZoop)
@@ -53,6 +54,27 @@ def update(**values) -> dict:
     data.update(values)
     save(data)
     return data
+
+
+def remember_options(title_no: int, opts: dict) -> None:
+    """이 VOD를 어떤 설정으로 분석했는지 적어 둔다 (나중에 설정을 바꾸고 불러오면 새로 분석할지 묻게)."""
+    try:
+        data = json.loads(OPTIONS_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    data[str(title_no)] = opts
+    try:
+        APP_DIR.mkdir(parents=True, exist_ok=True)
+        OPTIONS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    except OSError:
+        pass  # 못 적어도 분석 결과 저장에는 영향이 없다
+
+
+def options_of(title_no: int) -> dict | None:
+    try:
+        return json.loads(OPTIONS_PATH.read_text(encoding="utf-8")).get(str(title_no))
+    except (OSError, ValueError):
+        return None
 
 
 def speed() -> str:

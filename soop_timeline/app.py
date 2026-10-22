@@ -181,6 +181,7 @@ class Api:
             "category": vod.category,
             "view_cnt": vod.view_cnt,
             "saved": str(saved[0]) if saved else None,
+            "saved_opts": settings.options_of(title_no) if saved else None,
             "eta_model": settings.eta_model(),  # 이 PC에서 배운 단계별 속도
             # 이미 받아 둔 단계는 거의 바로 끝난다
             "cached": {
@@ -230,6 +231,8 @@ class Api:
             self._vods[vod.title_no] = vod
             self._chat.pop(vod.title_no, None)  # 새로 받은 채팅으로 별점줍을 다시 계산하게
             path = settings.save_timeline(vod.title_no, vod.title, entries, vod.bj_nick, vod.upload_date)
+            settings.remember_options(vod.title_no, {"amount": amount or "normal", "tone": tone or "clean",
+                                                     "min_count": min_count, "max_count": max_count})
             self._emit("result", vod=self._vod_info(vod), entries=[asdict(e) for e in entries], path=str(path))
         except Exception as e:  # 화면에 원인을 보여 준다
             diagnostics.log_error("분석", e, vod=parse_vod_id(link), amount=amount, min=min_count, max=max_count, tone=tone)
