@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -41,6 +42,21 @@ SYSTEM = (
     "시청자 채팅도 참고하되, 방송인이 실제로 한 행동과 이야기를 중심으로 쓴다. "
     "모르는 내용을 지어내지 않는다."
 )
+
+# 제목 말투: clean(깔끔, 기본) / friendly(친근: 방송·커뮤니티 말투)
+TONES = ("clean", "friendly")
+FRIENDLY = (
+    "\n\n[제목 말투] 인터넷 방송 시청자나 커뮤니티에서 쓰는 친근한 말투로 쓴다. "
+    "말투 예: '족발 쌈 먹방 + 나무젓가락 TMI', '술기운에 아무말 대잔치 (갑분 고양이)', '이동키 꼬여서 대혼란'. "
+    "예시를 그대로 베끼지 말고 이 장면 내용으로 새로 쓴다. "
+    "지킬 것: 25자 이내 / 'ㅋㅋ'·'ㄷㄷ' 같은 표현은 꼭 어울릴 때만 한 번 / "
+    "방송인을 비하·조롱하거나 욕설·혐오 표현을 쓰지 않는다 / 실제보다 부풀리지 않는다 / "
+    "'~및 ~관련' 같은 딱딱한 말은 쓰지 않는다 / 괴담·먹방처럼 장르가 분명하면 [괴담] 같은 말머리를 붙여도 된다."
+)
+
+
+def tone_rule(tone: str | None) -> str:
+    return FRIENDLY if tone == "friendly" else ""
 
 
 @dataclass
@@ -157,7 +173,7 @@ def _merge_quiet(starts: list[int], blocks: list[Block], min_len: float = 600.0,
 
 
 def group_chapters(llm: LocalLLM, vod: VodInfo, blocks: list[Block], split_step=None, title_step=None,
-                   dens: dict | None = None) -> list[Chapter]:
+                   dens: dict | None = None, tone: str | None = None) -> list[Chapter]:
     # 개수 상한은 두지 않는다: 주제가 바뀐 곳은 다 나누되, 짧고 조용한 장면만 앞에 합친다 (기준은 타임라인 개수에 따라)
     d = dens or density(None)
     starts = _merge_quiet(_split_points(llm, blocks, split_step), blocks, d["min_len"], d["busy"])
@@ -171,6 +187,7 @@ def group_chapters(llm: LocalLLM, vod: VodInfo, blocks: list[Block], split_step=
             f"시청자 채팅 일부: {chats or '(없음)'}\n\n"
             "이 장면 전체를 대표하는 타임라인 제목을 20자 이내로 써라. "
             "시청자가 보고 바로 어떤 장면인지 알 수 있게 구체적으로 쓴다 ('잡담'보다 '첫 월급으로 산 물건 자랑'처럼)."
+            + tone_rule(tone)
         )
         title = llm.json(SYSTEM, user, TITLE_SCHEMA, max_tokens=80, temperature=0.2)["title"].strip()
         chapters.append(Chapter(blocks[s].t0, title or part[0].summary[:20], s))
@@ -214,7 +231,8 @@ HL_SCHEMA = {
 }
 
 
-def title_highlights(llm: LocalLLM, segments: list[Segment], highlights: list[Highlight], step=None) -> list[Entry]:
+def title_highlights(llm: LocalLLM, segments: list[Segment], highlights: list[Highlight], step=None,
+                     tone: str | None = None) -> list[Entry]:
     def one(h: Highlight) -> Entry | None:
         if h.kind == "balloon":
             return None  # 후원 자체는 타임라인에 넣지 않는다 (사용자 요청)
@@ -224,6 +242,7 @@ def title_highlights(llm: LocalLLM, segments: list[Segment], highlights: list[Hi
             f"시청자 채팅이 갑자기 늘어난 장면이다 (반응: {h.label}).\n"
             f"채팅: {' / '.join(h.samples) or '(없음)'}\n\n주변 대본:\n{text}\n\n"
             "이 장면을 타임라인에 넣을 20자 이내 제목을 붙이고, 넣을 만한 장면인지 판단해라."
+            + tone_rule(tone)
         )
         out = llm.json(SYSTEM, user, HL_SCHEMA, max_tokens=120)
         title = out["title"].strip()
@@ -243,7 +262,7 @@ def merge_entries(chapters: list[Entry], highlights: list[Entry], gap: float = 7
 
 
 def _fill_to_min(llm: LocalLLM, vod: VodInfo, segments: list[Segment], events: list[ChatEvent],
-                 entries: list[Entry], need: int, d: dict, step=None) -> list[Entry]:
+                 entries: list[Entry], need: int, d: dict, step=None, tone: str | None = None) -> list[Entry]:
     """최소 개수보다 적으면, 채팅 반응 기준을 낮춰 더 찾은 순간 중 반응이 큰 것부터 제목을 붙여 채운다."""
     from .highlights import find_highlights
 
@@ -257,10 +276,25 @@ def _fill_to_min(llm: LocalLLM, vod: VodInfo, segments: list[Segment], events: l
             break
         if any(abs(h.t - a.t) <= d["merge_gap"] for a in added):
             continue
-        added += title_highlights(llm, segments, [h])
+        added += title_highlights(llm, segments, [h], tone=tone)
         if step:
             step(len(entries) + len(added), need)
     return sorted(entries + added, key=lambda e: e.t)
+
+
+_LAUGH = re.compile(r"\s*[ㅋㄷㅎ]{2,}[!?~]*\s*$")
+
+
+def _tame_laughs(entries: list[Entry]) -> list[Entry]:
+    """친근 말투: 'ㅋㅋ'·'ㄷㄷ'로 끝나는 제목은 네 줄에 한 줄 정도만 남기고, 나머지는 끝의 'ㅋㅋ'를 뗀다."""
+    allow = max(1, len(entries) // 4)
+    for e in entries:
+        if _LAUGH.search(e.title):
+            if allow > 0:
+                allow -= 1
+            else:
+                e.title = _LAUGH.sub("", e.title).rstrip() or e.title
+    return entries
 
 
 def _trim_to_max(vod: VodInfo, events: list[ChatEvent], entries: list[Entry], keep: int) -> list[Entry]:
@@ -285,6 +319,7 @@ def make_timeline(
     dens: dict | None = None,
     min_count: int | None = None,
     max_count: int | None = None,
+    tone: str | None = None,
 ) -> list[Entry]:
     """progress(메시지, 0~1)로 4단계 안의 세부 작업 진행률을 알린다.
     min_count / max_count: 사용자가 정한 줄 수 범위 (없으면 개수 설정대로)."""
@@ -302,13 +337,13 @@ def make_timeline(
         progress("정리 AI를 불러오고 있어요", 0.0)
     with LocalLLM(**kwargs) as llm:
         summarize_blocks(llm, vod, blocks, phase("5분 구간마다 무슨 일이 있었는지 요약하고 있어요", 0.0, 0.40))
-        chapters = group_chapters(llm, vod, blocks, phase("장면이 바뀌는 지점을 찾고 있어요", 0.40, 0.75), phase("장면마다 제목을 붙이고 있어요", 0.75, 0.85), dens)
+        chapters = group_chapters(llm, vod, blocks, phase("장면이 바뀌는 지점을 찾고 있어요", 0.40, 0.75), phase("장면마다 제목을 붙이고 있어요", 0.75, 0.85), dens, tone)
         refine_starts(llm, blocks, chapters, phase("장면 시작 시각을 초 단위로 맞추고 있어요", 0.85, 0.93))
-        hl_entries = title_highlights(llm, segments, highlights, phase("채팅이 터진 순간에 제목을 붙이고 있어요", 0.93, 1.0))
+        hl_entries = title_highlights(llm, segments, highlights, phase("채팅이 터진 순간에 제목을 붙이고 있어요", 0.93, 1.0), tone)
         d = dens or density(None)
         entries = merge_entries([Entry(c.t, c.title, "chapter") for c in chapters], hl_entries, d["merge_gap"])
         if min_count and len(entries) < min_count:
-            entries = _fill_to_min(llm, vod, segments, events, entries, min_count, d, phase("모자란 줄을 채우고 있어요", 0.97, 1.0))
+            entries = _fill_to_min(llm, vod, segments, events, entries, min_count, d, phase("모자란 줄을 채우고 있어요", 0.97, 1.0), tone)
 
     tag = (model or "default").removesuffix(".gguf")
     (cache_dir / f"blocks_{tag}.json").write_text(
@@ -318,6 +353,8 @@ def make_timeline(
     )
     if max_count and len(entries) > max_count:
         entries = _trim_to_max(vod, events, entries, max_count)
+    if tone == "friendly":
+        entries = _tame_laughs(entries)
     (cache_dir / f"timeline_{tag}.json").write_text(
         json.dumps([asdict(e) for e in entries], ensure_ascii=False, indent=1), encoding="utf-8"
     )

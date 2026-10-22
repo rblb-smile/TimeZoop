@@ -24,9 +24,10 @@ def _noop(stage, message, ratio=None):
 
 
 def run(link: str, *, chat_only: bool = False, model: str | None = None, progress=_noop, cookies: dict | None = None,
-        amount: str | None = None, min_count: int | None = None, max_count: int | None = None):
+        amount: str | None = None, min_count: int | None = None, max_count: int | None = None,
+        tone: str | None = None):
     """cookies: 연령·구독 제한 다시보기일 때만 넘기는 SOOP 로그인 쿠키. amount: 타임라인 개수 (many / normal / few).
-    min_count / max_count: 사용자가 정한 줄 수 범위 (선택)."""
+    min_count / max_count: 사용자가 정한 줄 수 범위 (선택). tone: 제목 말투 (clean / friendly)."""
     control.lower_priority()
     report = progress
 
@@ -84,7 +85,7 @@ def run(link: str, *, chat_only: bool = False, model: str | None = None, progres
     entries = make_timeline(
         vod, segments, events, hl, cache, model,
         lambda message, ratio: progress("llm", message, ratio),
-        dens, min_count, max_count,
+        dens, min_count, max_count, tone,
     )
     settings.learn_eta("llm", control.clock() - t_llm, vod.duration)
     progress("done", "완료", 1.0)

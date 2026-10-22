@@ -188,19 +188,22 @@ class Api:
                 "stt": (pipeline.DATA_ROOT / str(title_no) / "transcript_large-v3.json").exists(),
             },
             "amount": settings.load().get("amount") or "normal",
+            "tone": settings.load().get("tone") or "clean",
         }
 
-    def analyze(self, link: str, amount: str | None = None, min_count=None, max_count=None) -> dict:
-        """amount: 타임라인 개수 (many / normal / few). 고른 값은 다음 분석의 기본값으로 저장한다.
+    def analyze(self, link: str, amount: str | None = None, min_count=None, max_count=None, tone: str | None = None) -> dict:
+        """amount: 타임라인 개수 (many / normal / few), tone: 제목 말투 (clean / friendly). 고른 값은 다음 분석의 기본값으로 저장한다.
         min_count / max_count: 이번 분석의 줄 수 범위 (선택, 저장하지 않는다)."""
         if self._busy:
             return {"ok": False, "error": "이미 분석 중입니다"}
-        from .chapters import DENSITY
+        from .chapters import DENSITY, TONES
 
+        data = settings.load()
         if amount in DENSITY:
-            data = settings.load()
             data["amount"] = amount
-            settings.save(data)
+        if tone in TONES:
+            data["tone"] = tone
+        settings.save(data)
         self._busy = True
         self._busy_title_no = parse_vod_id(link)
         def num(v):
@@ -213,16 +216,17 @@ class Api:
         lo, hi = num(min_count), num(max_count)
         if lo and hi and lo > hi:
             lo, hi = hi, lo
-        threading.Thread(target=self._analyze, args=(link, settings.load().get("amount"), lo, hi), daemon=True).start()
+        threading.Thread(target=self._analyze, args=(link, settings.load().get("amount"), lo, hi, settings.load().get("tone")), daemon=True).start()
         return {"ok": True}
 
-    def _analyze(self, link: str, amount: str | None = None, min_count: int | None = None, max_count: int | None = None) -> None:
+    def _analyze(self, link: str, amount: str | None = None, min_count: int | None = None, max_count: int | None = None,
+                 tone: str | None = None) -> None:
         try:
             # 연령·구독 제한 다시보기면 로그인한 계정으로 받는다 (확인 창 단계에서 판단)
             cookies = soop_account.load_cookies() if parse_vod_id(link) in self._needs_login else None
             vod, entries = pipeline.run(
                 link, progress=lambda stage, msg, ratio=None: self._emit("progress", stage=stage, message=msg, ratio=ratio),
-                cookies=cookies, amount=amount, min_count=min_count, max_count=max_count,
+                cookies=cookies, amount=amount, min_count=min_count, max_count=max_count, tone=tone,
             )
             # 분석 중에 다른 타임라인을 편집하고 있을 수 있으니 self._vod는 바꾸지 않는다 (화면이 activate로 연다)
             self._vods[vod.title_no] = vod
@@ -230,7 +234,7 @@ class Api:
             path = settings.save_timeline(vod.title_no, vod.title, entries, vod.bj_nick, vod.upload_date)
             self._emit("result", vod=self._vod_info(vod), entries=[asdict(e) for e in entries], path=str(path))
         except Exception as e:  # 화면에 원인을 보여 준다
-            diagnostics.log_error("분석", e, vod=parse_vod_id(link), amount=amount, min=min_count, max=max_count)
+            diagnostics.log_error("분석", e, vod=parse_vod_id(link), amount=amount, min=min_count, max=max_count, tone=tone)
             from .soop_api import AccessRequired, VodError
 
             if isinstance(e, AccessRequired):

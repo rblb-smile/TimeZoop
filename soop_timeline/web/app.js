@@ -10,7 +10,7 @@ const DIAG_IN = [
   "타임줍 버전",
   "PC 사양\nWindows 버전 · CPU · 메모리 · 그래픽카드(이름·VRAM·드라이버) · 남은 저장 공간",
   "AI 모델 상태",
-  "앱 설정\n화면 모드 · 효과음 · 작업 속도 · 타임라인 개수 · 댓글 꾸미기 · 남은 시간 계산값",
+  "앱 설정\n화면 모드 · 효과음 · 작업 속도 · 타임라인 개수 · 말투 · 댓글 꾸미기 · 남은 시간 계산값",
   "오류 기록\n앱 오류 · 마지막으로 실패한 작업 · 정리 AI 실행 기록 · 자가 진단 기록\n(실패한 다시보기 번호가 들어갈 수 있어요)",
 ];
 const DIAG_OUT = [
@@ -20,6 +20,23 @@ const DIAG_OUT = [
   "PC 사용자 이름과 SOOP 계정 이름\n(기록에 있으면 <사용자>로 바꿔요)",
 ];
 const DIAG_SEND = "만든 파일은 어디로도 자동으로 보내지 않아요.\n직접 디스코드에 올릴 때만 전달돼요.";
+// 말투 예시 (다시보기 확인 창의 ? 버튼)
+const TONE_SAMPLES = [
+  ["깔끔", "🥇 BEST ZOOP 02:12:42 ⟡ 31 ZOOP ⟡\n\n" +
+    "00:00:00 방송 시작 인사 및 의상·효과 오류 점검\n" +
+    "01:15:42 취기 어린 헛소리와 뜬금없는 고양이 언급\n" +
+    "01:46:13 족발 쌈 먹방과 나무젓가락 습관 잡담\n" +
+    "02:12:42 시청자 반응 폭발 및 채팅 급증\n" +
+    "06:42:42 냄새를 따라갔다가 스토커와 마주친 괴담\n\n" +
+    "‧₊˚✧  made with  TIMEZOOP  ✧˚₊‧"],
+  ["친근", "🥇 BEST ZOOP 02:12:42 ⟡ 31 ZOOP ⟡\n\n" +
+    "00:00:00 방송 ON, 시작부터 의상 효과 고장남ㅋㅋ\n" +
+    "01:15:42 술기운에 아무말 대잔치 (갑분 고양이)\n" +
+    "01:46:13 족발 쌈 먹방 + 나무젓가락 TMI\n" +
+    "02:12:42 채팅창 터짐 ㄷㄷ\n" +
+    "06:42:42 [괴담] 냄새 따라갔다가 스토커 마주침\n\n" +
+    "‧₊˚✧  made with  TIMEZOOP  ✧˚₊‧"],
+];
 const STYLE_NAMES = { bracket: "낫표", angle: "괄호", pang: "팡!", dust: "별가루", star: "별하나", none: "없음" };
 const STYLE_MARKS = { bracket: "「 」", angle: "〈 〉", pang: "-ˏˋ ˎˊ-", dust: "⁺₊ ₊⁺", star: "⋆ ⋆", none: "" };
 const STARS_RE = /^(.*?)(\s+)(\S*\s?[✦✧]{5}.*)$/u;  // 줄 끝의 별점줍 (모양과 상관없이)
@@ -589,9 +606,33 @@ const app = {
       el("span", { textContent: "최대" }), maxIn, el("span", { textContent: "개" }),
     ]);
     const rangeNote = el("p", { className: "count-note", textContent: "비워 두면 방송 길이와 채팅 반응을 보고 딱 알맞은 개수로 정리해 드려요.\n숫자는 하나만 넣어도 돼요." });
+    // 제목 말투: 깔끔 / 친근. (?)를 누르면 댓글로 올렸을 때 모습을 예시로 보여 준다
+    let tone = chk.tone || "clean";
+    const tones = [["clean", "깔끔", "담백하게 내용 위주로"], ["friendly", "친근", "방송·커뮤니티 말투로"]];
+    const toneHint = el("span", { className: "amount-hint" });
+    const toneSeg = el("div", { className: "segmented" }, tones.map(([v, label, desc]) => {
+      const b = el("button", { className: v === tone ? "on" : "", textContent: label });
+      b.onclick = () => { tone = v; toneSeg.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); toneHint.textContent = desc; };
+      if (v === tone) toneHint.textContent = desc;
+      return b;
+    }));
+    const toneHelp = el("div", { className: "tone-help hidden" }, [
+      el("p", { className: "count-note", textContent: "같은 방송을 두 말투로 정리하면 이렇게 올라가요." }),
+      ...TONE_SAMPLES.map(([label, text]) => el("div", { className: "tone-sample" }, [
+        el("span", { className: "tone-label", textContent: label }),
+        el("div", { className: "comment" }, [
+          el("div", { className: "avatar", textContent: "시" }),
+          el("div", { className: "body" }, [el("div", { className: "who" }, ["시청자", el("span", { textContent: "방금 전" })]), this.commentPre(text)]),
+        ]),
+      ])),
+    ]);
+    const helpBtn = el("button", { className: "help-btn", title: "말투 예시 보기", textContent: "?" });
+    helpBtn.onclick = () => { toneHelp.classList.toggle("hidden"); helpBtn.classList.toggle("on"); };
     const amountRow = el("div", { className: "amount-row" }, [
       el("div", { className: "amount-top" }, [el("b", { textContent: "타임라인 개수" }), seg, hint]),
       range, rangeNote,
+      el("div", { className: "amount-top" }, [el("b", { textContent: "말투" }), toneSeg, helpBtn, toneHint]),
+      toneHelp,
     ]);
     const choice = await this.modal("이 다시보기가 맞나요?", [this.vodCard(chk), amountRow], chk.saved
       ? [["취소", null, "ghost"], ["새로 분석", "new"], ["불러오기", "open", "primary"]]
@@ -601,7 +642,7 @@ const app = {
     const toNum = (i) => { const v = parseInt(i.value, 10); return Number.isFinite(v) && v > 0 ? Math.min(v, 300) : null; };
     let minN = toNum(minIn), maxN = toNum(maxIn);
     if (minN && maxN && minN > maxN) [minN, maxN] = [maxN, minN];  // 거꾸로 넣었으면 바로잡는다
-    const r = await api().analyze(link, amount, minN, maxN);
+    const r = await api().analyze(link, amount, minN, maxN, tone);
     if (!r.ok) return this.alert("시작하지 못했어요", r.error);
     $("btnAnalyze").disabled = true;
     this.job = { active: true, startedAt: Date.now(), titleNo: chk.title_no, duration: chk.duration, etaModel: chk.eta_model, cached: chk.cached, pct: 0 };
@@ -614,6 +655,7 @@ const app = {
       chip("타임라인 개수", amounts.find(([v]) => v === amount)[1]),
       chip("최소", minN ? `${minN}개` : "알아서"),
       chip("최대", maxN ? `${maxN}개` : "알아서"),
+      chip("말투", tone === "friendly" ? "친근" : "깔끔"),
     );
     this.onProgress({ stage: "fetch", message: "다시보기 정보를 확인하고 있어요", ratio: null });
     this.show("viewProgress");
