@@ -402,11 +402,16 @@ const app = {
 
   // ---------- 백그라운드 작업 현황 (하단 막대) ----------
   overall() {
-    // 단계별 예상 시간을 비중으로 전체 진행률을 계산한다 (남은 시간과 같은 기준)
+    // 단계별 예상 시간을 비중으로 전체 진행률을 계산한다 (남은 시간과 같은 기준).
+    // 다만 받아 둔 데이터로 바로 끝나는 단계(다시 분석할 때의 받기·채팅·음성 인식)는 한 칸(25%)씩 끝난 것으로 쳐서,
+    // 타임라인 작성만 남았으면 게이지가 75%부터 차오르게 한다
     const est = this.stageEstimates();
-    const total = Object.values(est).reduce((a, b) => a + b, 0);
-    const weight = Object.fromEntries(Object.entries(est).map(([k, v]) => [k, v / total]));
+    const c = this.job.cached || {};
+    const instant = { fetch: !!c.audio, chat: !!(c.audio && c.stt), stt: !!c.stt, llm: false };
     const order = ["fetch", "chat", "stt", "llm"];
+    const fixed = order.filter((k) => instant[k]).length * 0.25;
+    const total = order.filter((k) => !instant[k]).reduce((a, k) => a + est[k], 0) || 1;
+    const weight = Object.fromEntries(order.map((k) => [k, instant[k] ? 0.25 : (1 - fixed) * est[k] / total]));
     const st = this.job.stage || "fetch";
     if (st === "done") return 1;
     const r = this.job.ratio == null ? 0.5 : this.job.ratio;
@@ -426,7 +431,9 @@ const app = {
     const order = ["fetch", "chat", "stt", "llm"];
     const idx = j.result ? 4 : order.indexOf(j.stage || "fetch");
     t.querySelectorAll(".stop").forEach((s, i) => { s.classList.toggle("done", i < idx); s.classList.toggle("active", i === idx && !j.error); });
-    $("routeFill").style.width = j.result ? "100%" : `${Math.min(99, (j.pct || 0) * 100)}%`;
+    // 선은 지나온 칸까지는 항상 닿고, 지금 단계가 진행된 만큼 그 칸 쪽으로 늘어난다
+    const r = Math.min(1, Math.max(0, j.ratio == null ? 0 : j.ratio));
+    $("routeFill").style.width = j.result ? "100%" : `${(Math.max(0, idx - 1 + r) / 3) * 100}%`;
     if (j.result) {
       $("trackerState").textContent = "완료";
       $("trackerTitle").textContent = "타임라인이 완성됐어요! 눌러서 확인하기";
