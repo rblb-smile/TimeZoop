@@ -462,7 +462,7 @@ const app = {
     const weight = Object.fromEntries(order.map((k) => [k, instant[k] ? 0.25 : (1 - fixed) * est[k] / total]));
     const st = this.job.stage || "fetch";
     if (st === "done") return 1;
-    const r = this.job.ratio == null ? 0.5 : this.job.ratio;
+    const r = this.job.ratio == null ? 0 : this.job.ratio;  // 아직 진행률을 모르면 그 단계는 시작 전으로 본다
     let p = 0;
     for (const k of order) { if (k === st) break; p += weight[k]; }
     return p + weight[st] * Math.min(1, Math.max(0, r));
