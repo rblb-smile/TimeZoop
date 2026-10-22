@@ -314,6 +314,7 @@ def download_audio(vod: VodInfo, cache_dir: Path, ffmpeg: str | None = None, pro
                 stdout=subprocess.PIPE, text=True,
                 creationflags=control.child_flags(),
             )
+            control.tie_to_app(proc)  # 타임줍이 꺼지면 받던 것도 함께 멈추게
             for line in proc.stdout:
                 if progress and line.startswith("out_time_us="):
                     try:

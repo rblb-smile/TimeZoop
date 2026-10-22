@@ -50,6 +50,7 @@ class LocalLLM:
             stdout=log, stderr=subprocess.STDOUT,
             creationflags=control.child_flags(),
         )
+        control.tie_to_app(self.proc)  # 타임줍이 꺼지면 함께 꺼지게
         self.client = httpx.Client(base_url=f"http://127.0.0.1:{self.port}", timeout=600)
         deadline = time.time() + 300
         while time.time() < deadline:

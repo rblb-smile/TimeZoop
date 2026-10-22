@@ -79,6 +79,47 @@ def child_flags() -> int:
     return subprocess.CREATE_NO_WINDOW | BELOW_NORMAL_PRIORITY_CLASS
 
 
+class _LimitInfo(ctypes.Structure):
+    _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                ("LimitFlags", ctypes.c_uint32), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", ctypes.c_uint32),
+                ("Affinity", ctypes.c_size_t), ("PriorityClass", ctypes.c_uint32), ("SchedulingClass", ctypes.c_uint32)]
+
+
+class _ExtLimitInfo(ctypes.Structure):
+    _fields_ = [("BasicLimitInformation", _LimitInfo), ("IoInfo", ctypes.c_uint64 * 6),
+                ("ProcessMemoryLimit", ctypes.c_size_t), ("JobMemoryLimit", ctypes.c_size_t),
+                ("PeakProcessMemoryUsed", ctypes.c_size_t), ("PeakJobMemoryUsed", ctypes.c_size_t)]
+
+
+_job = None
+
+
+def tie_to_app(proc: subprocess.Popen) -> None:
+    """자식 프로세스(정리 AI 서버·ffmpeg)를 타임줍과 묶는다. 타임줍이 어떻게 꺼지든(창 닫기·강제 종료·업데이트 설치)
+    Windows가 함께 끈다. 예전에는 분석 중에 타임줍이 꺼지면 정리 AI가 남아 그래픽카드 메모리를 계속 잡았다."""
+    global _job
+    if sys.platform != "win32":
+        return
+    from ctypes import wintypes
+
+    k32 = ctypes.windll.kernel32
+    try:
+        if _job is None:
+            k32.CreateJobObjectW.restype = wintypes.HANDLE
+            job = k32.CreateJobObjectW(None, None)
+            info = _ExtLimitInfo()
+            info.BasicLimitInformation.LimitFlags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            k32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+            if not k32.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info)):  # Extended limit
+                return
+            _job = job
+        k32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        k32.AssignProcessToJobObject(_job, wintypes.HANDLE(int(proc._handle)))
+    except (AttributeError, OSError, ValueError):
+        pass  # 묶지 못해도 분석에는 지장이 없다 (끝나면 직접 끈다)
+
+
 def lower_priority() -> None:
     """이 프로세스(음성 인식이 도는 곳)의 우선순위를 낮춘다. 화면은 별도 WebView 프로세스라 영향이 없다."""
     if sys.platform == "win32":
