@@ -509,3 +509,8 @@ body.dock-open .tracker { bottom: 92px; }  /* 편집·미리보기 하단 버튼
 .tone-sample .comment { margin: 0; padding: 10px 12px; }
 .tone-sample .comment pre { font-size: 12.5px; line-height: 1.6; }
 .tone-sample .comment .avatar { width: 26px; height: 26px; font-size: 12px; }
+
+/* 창이 화면보다 길면(말투 예시를 펼쳤을 때 등) 제목·버튼은 그대로 두고 내용만 스크롤 */
+.modal { max-height: calc(100vh - 40px); display: flex; flex-direction: column; }
+.modal #modalBody { overflow-y: auto; min-height: 0; margin-right: -12px; padding-right: 12px; }
+.modal h3, .modal .actions { flex: none; }

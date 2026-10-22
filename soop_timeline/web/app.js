@@ -634,7 +634,11 @@ const app = {
       ])),
     ]);
     const helpBtn = el("button", { className: "help-btn", title: "말투 예시 보기", textContent: "?" });
-    helpBtn.onclick = () => { toneHelp.classList.toggle("hidden"); helpBtn.classList.toggle("on"); };
+    helpBtn.onclick = () => {
+      toneHelp.classList.toggle("hidden");
+      helpBtn.classList.toggle("on");
+      if (!toneHelp.classList.contains("hidden")) toneHelp.scrollIntoView({ behavior: "smooth", block: "nearest" });  // 펼친 예시가 보이게
+    };
     const amountRow = el("div", { className: "amount-row" }, [
       el("div", { className: "amount-top" }, [el("b", { textContent: "타임라인 개수" }), seg, hint]),
       range, rangeNote,
