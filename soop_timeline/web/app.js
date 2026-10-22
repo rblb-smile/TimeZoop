@@ -10,7 +10,7 @@ const DIAG_IN = [
   "타임줍 버전",
   "PC 사양\nWindows 버전 · CPU · 메모리 · 그래픽카드(이름·VRAM·드라이버) · 남은 저장 공간",
   "AI 모델 상태",
-  "앱 설정\n화면 모드 · 효과음 · 작업 속도 · 타임라인 개수 · 말투 · 댓글 꾸미기 · 남은 시간 계산값",
+  "앱 설정\n화면 모드 · 효과음 · 완료 알림 · 작업 속도 · 타임라인 개수 · 말투 · 댓글 꾸미기 · 남은 시간 계산값",
   "오류 기록\n앱 오류 · 마지막으로 실패한 작업 · 정리 AI 실행 기록 · 자가 진단 기록\n(실패한 다시보기 번호가 들어갈 수 있어요)",
 ];
 const DIAG_OUT = [
@@ -114,6 +114,54 @@ const sfx = {
       osc.connect(gain).connect(c.destination);
       osc.start(t);
       osc.stop(t + 0.14);
+    } catch { /* 소리가 안 나도 동작에는 지장 없음 */ }
+  },
+  // 분석 완료: 버튼 소리와 같은 물방울 소리가 도-미-솔-도로 올라가고, 끝에 반짝이는 소리가 퍼진다
+  notify: true,
+  drop(c, t, f, vol = 0.2, len = 0.16, fall = 0.55) {
+    const osc = c.createOscillator();
+    const gain = c.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(f, t);
+    osc.frequency.exponentialRampToValueAtTime(f * fall, t + len * 0.7);
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    osc.connect(gain).connect(c.destination);
+    osc.start(t);
+    osc.stop(t + len + 0.02);
+  },
+  fanfare() {
+    if (!this.notify) return;
+    try {
+      this.ctx = this.ctx || new AudioContext();
+      const c = this.ctx;
+      const t = c.currentTime + 0.02;
+      [523, 659, 784, 1047].forEach((f, i) => this.drop(c, t + i * 0.085, f * 1.5, 0.2, 0.2, 0.6));  // 물방울 4개가 올라가며
+      // 마지막에 화음이 은은하게 남고
+      [1047, 1319, 1568].forEach((f) => {
+        const osc = c.createOscillator();
+        const gain = c.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(f, t + 0.34);
+        gain.gain.setValueAtTime(0.0001, t + 0.34);
+        gain.gain.exponentialRampToValueAtTime(0.06, t + 0.38);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.3);
+        osc.connect(gain).connect(c.destination);
+        osc.start(t + 0.34);
+        osc.stop(t + 1.35);
+      });
+      // 반짝이는 높은 소리가 흩어진다
+      [2093, 2637, 3136, 2349, 3520, 2794].forEach((f, i) => this.drop(c, t + 0.4 + i * 0.07, f, 0.07, 0.12, 0.9));
+    } catch { /* 소리가 안 나도 동작에는 지장 없음 */ }
+  },
+  oops() {
+    if (!this.notify) return;
+    try {
+      this.ctx = this.ctx || new AudioContext();
+      const c = this.ctx;
+      const t = c.currentTime + 0.02;
+      [660, 440].forEach((f, i) => this.drop(c, t + i * 0.14, f, 0.16, 0.22, 0.7));  // 실패: 물방울 두 개가 내려간다
     } catch { /* 소리가 안 나도 동작에는 지장 없음 */ }
   },
 };
@@ -240,8 +288,8 @@ const app = {
     else if (kind === "setup_done") this.onSetupDone();
     else if (kind === "setup_error") this.onSetupError(d);
     else if (kind === "progress") this.onProgress(d);
-    else if (kind === "result") this.onJobDone(d);
-    else if (kind === "error") this.onJobError(d.message);
+    else if (kind === "result") { sfx.fanfare(); this.onJobDone(d); }
+    else if (kind === "error") { sfx.oops(); this.onJobError(d.message); }
     else if (kind === "login") {
       this.refreshLogin();
       if (this.loginWaiter) { this.loginWaiter(d.logged_in); this.loginWaiter = null; }
@@ -1001,6 +1049,8 @@ const app = {
     const sound = segmented([["on", "켜기"], ["off", "끄기"]], sfx.enabled ? "on" : "off",
       (value) => { sfx.enabled = value === "on"; api().set_sound(sfx.enabled); });
     // 작업 속도: 높은 속도 = 정리 AI 질문 2개씩 (그래픽카드 메모리를 더 씀)
+    const notifySeg = segmented([["on", "켜기"], ["off", "끄기"]], sfx.notify ? "on" : "off",
+      (value) => { sfx.notify = value === "on"; api().set_notify(sfx.notify); if (sfx.notify) sfx.fanfare(); });
     const speed = segmented([["fast", "높은 속도"], ["slow", "낮은 속도"]], s.speed, (value) => api().set_speed(value));
     const vram = s.vram_gb ? `이 PC 그래픽카드 메모리: ${s.vram_gb}GB` : "그래픽카드 메모리를 확인하지 못했어요";
     const speedHint = el("p", { className: "count-note", textContent:
@@ -1010,6 +1060,8 @@ const app = {
     await this.modal("설정", [
       el("div", { className: "field" }, [el("label", { textContent: "화면 모드" }), seg]),
       el("div", { className: "field" }, [el("label", { textContent: "버튼 효과음" }), sound]),
+      el("div", { className: "field" }, [el("label", { textContent: "완료 알림" }), notifySeg,
+        el("p", { className: "count-note", textContent: "분석이 끝나면 효과음을 울려요.\n다른 창을 보고 있으면 화면 오른쪽 아래에 알림도 띄워요." })]),
       el("div", { className: "field" }, [el("label", { textContent: "작업 속도" }), speed, speedHint]),
       el("div", { className: "field" }, [el("label", { textContent: "타임라인 저장 폴더" }), pathBox, el("div", { className: "row", style: "margin-top:8px" }, [btnChange, btnOpen])]),
       el("div", { className: "field" }, [el("label", { textContent: "SOOP 로그인" }), loginText, el("div", { className: "row" }, [btnLogin])]),
@@ -1063,7 +1115,7 @@ window.addEventListener("pywebviewready", () => {
   $("btnUpload").onclick = () => app.upload();
   $("btnSettings").onclick = () => app.settings();
   $("btnOpenFolder").onclick = $("btnFolderTop").onclick = () => api().open_save_dir();
-  api().get_settings().then((s) => { app.applyTheme(s.theme); sfx.enabled = s.sound !== false; });
+  api().get_settings().then((s) => { app.applyTheme(s.theme); sfx.enabled = s.sound !== false; sfx.notify = s.notify !== false; });
   $("btnSetupStart").onclick = () => app.startSetup();
   $("btnSetupCancel").onclick = () => api().cancel_download();
   app.loadSign();

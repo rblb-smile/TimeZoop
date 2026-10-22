@@ -16,7 +16,7 @@ from pathlib import Path
 
 import webview
 
-from . import control, diagnostics, models, pipeline, settings, soop_account, works
+from . import control, diagnostics, models, notify, pipeline, settings, soop_account, works
 from .soop_api import VodInfo, parse_vod_id
 from .timeline import Entry
 
@@ -68,6 +68,13 @@ class Api:
         self._busy_title_no: int | None = None
 
     # ---------- 화면에 알리기 ----------
+
+    def _notify(self, title: str, body: str) -> None:
+        """분석이 끝나면 알린다: 다른 창을 보고 있으면 오른쪽 아래 알림과 작업표시줄 반짝임 (설정에서 끌 수 있다)."""
+        if not settings.load().get("notify", True) or notify.is_foreground():
+            return
+        notify.toast(title, body, str(WEB_DIR / "logo.png"))
+        notify.flash_taskbar()
 
     def _emit(self, kind: str, **data) -> None:
         if self._window:
@@ -234,6 +241,7 @@ class Api:
             settings.remember_options(vod.title_no, {"amount": amount or "normal", "tone": tone or "clean",
                                                      "min_count": min_count, "max_count": max_count})
             self._emit("result", vod=self._vod_info(vod), entries=[asdict(e) for e in entries], path=str(path))
+            self._notify("타임라인이 완성됐어요", f"{vod.title}\n{len(entries)}줄 · 눌러서 확인하기")
         except Exception as e:  # 화면에 원인을 보여 준다
             diagnostics.log_error("분석", e, vod=parse_vod_id(link), amount=amount, min=min_count, max=max_count, tone=tone)
             from .soop_api import AccessRequired, VodError
@@ -244,6 +252,7 @@ class Api:
                 self._emit("error", message=str(e))
             else:
                 self._emit("error", message=f"{e.__class__.__name__}: {e}")
+            self._notify("분석하지 못했어요", "눌러서 원인을 확인해 주세요")
         finally:
             control.resume()  # 다음 분석이 멈춘 채로 시작하지 않게
             self._busy = False
@@ -374,11 +383,16 @@ class Api:
     def get_settings(self) -> dict:
         data = settings.load()
         return {"save_dir": str(settings.save_dir()), "theme": data.get("theme", "system"), "sound": data.get("sound", True),
+                "notify": data.get("notify", True),
                 "speed": settings.speed(), "speed_chosen": data.get("speed") in ("fast", "slow"),
                 "vram_gb": round(control.vram_mb() / 1024)}
 
     def set_speed(self, speed: str) -> dict:
         settings.update(speed=speed if speed in ("fast", "slow") else "slow")
+        return {"ok": True}
+
+    def set_notify(self, enabled: bool) -> dict:
+        settings.update(notify=bool(enabled))
         return {"ok": True}
 
     def set_sound(self, enabled: bool) -> dict:
@@ -507,6 +521,9 @@ def _clear_stale_web_cache(storage: Path) -> None:
 
 
 def main() -> None:
+    if notify.already_running():  # 이미 켜져 있으면 그 창을 앞으로 (알림을 눌렀을 때도)
+        return
+    notify.set_app_id()
     api = Api()
     storage = settings.APP_DIR / "webview"
     _clear_stale_web_cache(storage)

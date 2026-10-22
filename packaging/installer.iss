@@ -62,9 +62,9 @@ Type: files; Name: "{app}\_internal\cublas64_13.dll"
 Type: files; Name: "{app}\_internal\cublasLt64_13.dll"
 
 [Icons]
-Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\TimeZoop_tz.ico"
+Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\TimeZoop_tz.ico"; AppUserModelID: "rblb.TimeZoop"
 Name: "{group}\{#AppName} 제거"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\TimeZoop_tz.ico"; Tasks: desktopicon
+Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{app}\TimeZoop_tz.ico"; AppUserModelID: "rblb.TimeZoop"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{#AppName} 실행"; Flags: nowait postinstall skipifsilent
