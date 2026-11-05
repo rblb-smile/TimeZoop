@@ -23,6 +23,9 @@ def _noop(stage, message, ratio=None):
     pass
 
 
+CHAT_SHARE = 0.05  # 데이터 받기 단계에서 채팅이 차지하는 몫 (몇 초면 끝나고, 대부분은 음성 받기다)
+
+
 def run(link: str, *, chat_only: bool = False, model: str | None = None, progress=_noop, cookies: dict | None = None,
         amount: str | None = None, min_count: int | None = None, max_count: int | None = None,
         tone: str | None = None):
@@ -39,17 +42,17 @@ def run(link: str, *, chat_only: bool = False, model: str | None = None, progres
     progress("fetch", "다시보기 정보를 확인하고 있어요", None)
     vod, events, _, cache = load_or_fetch(
         link, DATA_ROOT, False,
-        lambda done, total: progress("fetch", f"SOOP에서 채팅 다시보기를 받고 있어요 ({done}/{total})", done / total * 0.3),
+        lambda done, total: progress("fetch", f"SOOP에서 채팅 다시보기를 받고 있어요 ({done}/{total})", done / total * CHAT_SHARE),
         cookies=cookies,
     )
     audio = []
     # 이미 받아 둔 단계는 순식간에 끝나므로 남은 시간 학습에서 뺀다
     audio_cached = all((cache / f"audio_{f.key}.m4a").exists() for f in vod.files if f.audio_url)
     if not chat_only:
-        progress("fetch", "방송 음성을 받고 있어요 · 처음 한 번만 몇 분 걸려요", 0.3)
+        progress("fetch", "방송 음성을 받고 있어요 · 처음 한 번만 몇 분 걸려요", CHAT_SHARE)
         audio = download_audio(
             vod, cache,
-            progress=lambda r: progress("fetch", "방송 음성을 받고 있어요 · 처음 한 번만 몇 분 걸려요", 0.3 + 0.7 * r),
+            progress=lambda r: progress("fetch", "방송 음성을 받고 있어요 · 처음 한 번만 몇 분 걸려요", CHAT_SHARE + (1 - CHAT_SHARE) * r),
             cookies=cookies,
         )
 
