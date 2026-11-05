@@ -15,6 +15,7 @@ from .chapters import density
 from .highlights import find_highlights
 from .paths import DATA_ROOT  # 개발 중엔 프로젝트/data, exe에선 %LOCALAPPDATA%/TimeZoop/data
 from .soop_api import VodInfo, download_audio, load_or_fetch
+from .stt import TRANSCRIPT_FILE
 from .timeline import Entry, fmt_time
 
 
@@ -71,7 +72,7 @@ def run(link: str, *, chat_only: bool = False, model: str | None = None, progres
     if not audio_cached:
         settings.learn_eta("fetch", control.clock() - t_fetch, vod.duration)
 
-    stt_cached = (cache / "transcript_large-v3.json").exists()
+    stt_cached = (cache / TRANSCRIPT_FILE).exists()
     t_stt = control.clock()
     progress("stt", "음성 인식 AI를 불러오고 있어요", 0.0)
     segments = transcribe(

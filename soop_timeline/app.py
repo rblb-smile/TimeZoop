@@ -193,7 +193,7 @@ class Api:
             # 이미 받아 둔 단계는 거의 바로 끝난다
             "cached": {
                 "audio": all((pipeline.DATA_ROOT / str(title_no) / f"audio_{f.key}.m4a").exists() for f in vod.files),
-                "stt": (pipeline.DATA_ROOT / str(title_no) / "transcript_large-v3.json").exists(),
+                "stt": (pipeline.DATA_ROOT / str(title_no) / pipeline.TRANSCRIPT_FILE).exists(),
             },
             "amount": settings.load().get("amount") or "normal",
             "tone": settings.load().get("tone") or "clean",

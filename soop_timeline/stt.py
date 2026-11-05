@@ -24,12 +24,28 @@ class Segment:
     text: str
 
 
+TRANSCRIPT_FILE = "transcript_large-v3_words.json"  # 문장 단위 대본. 예전 1분 단위 대본(transcript_large-v3.json)은 쓰지 않는다
+
 _REPEAT = re.compile(r"(.{1,8}?)\1{4,}")
 
 
 def clean_text(text: str) -> str:
     """'냠냠냠냠…'처럼 Whisper가 같은 조각을 끝없이 반복한 부분을 3번으로 줄인다."""
     return _REPEAT.sub(lambda m: m.group(1) * 3, text).strip()
+
+
+def _sentences(words) -> list[tuple[float, float, str]]:
+    """단어 시각을 문장 단위로 묶는다. 문장 부호나 1초 이상 쉬는 곳에서 끊는다.
+    조각이 짧아야 장면이 시작되는 시각을 초 단위로 고를 수 있다 (묶음 처리 결과는 그대로 쓰면 30초~1분씩 뭉친다)."""
+    out, cur = [], []
+    for w in words:
+        if cur and (w.start - cur[-1].end > 1.0 or cur[-1].word.rstrip()[-1:] in (".", "?", "!")):
+            out.append(cur)
+            cur = []
+        cur.append(w)
+    if cur:
+        out.append(cur)
+    return [(c[0].start, c[-1].end, "".join(w.word for w in c)) for c in out]
 
 
 def _add_cuda_dlls() -> None:
@@ -85,7 +101,7 @@ def transcribe(
 ) -> list[Segment]:
     """파일별로 받아쓰고 오프셋을 더해 하나의 대본으로 합친다. clip은 시험용(첫 파일 앞부분)."""
     suffix = f"_clip{int(clip[1])}_b{batch_size}" if clip else ""
-    out_path = cache_dir / f"transcript_{model_name}{suffix}.json"
+    out_path = cache_dir / (TRANSCRIPT_FILE if model_name == "large-v3" and not clip else f"transcript_{model_name}_words{suffix}.json")
     if out_path.exists():
         return [Segment(**s) for s in json.loads(out_path.read_text(encoding="utf-8"))]
 
@@ -105,12 +121,14 @@ def transcribe(
             vad_filter=True,
             vad_parameters={"min_silence_duration_ms": 500},
             condition_on_previous_text=False,  # 긴 방송에서 같은 문장이 반복 출력되는 문제 방지
+            word_timestamps=True,
             **extra,
         )
         for s in segs:
-            text = clean_text(s.text)
-            if text:
-                segments.append(Segment(round(f.offset + s.start, 2), round(f.offset + s.end, 2), text))
+            for t0, t1, raw in _sentences(s.words) if s.words else [(s.start, s.end, s.text)]:
+                text = clean_text(raw)
+                if text:
+                    segments.append(Segment(round(f.offset + t0, 2), round(f.offset + t1, 2), text))
             if progress:
                 progress(f.offset + s.end, vod.duration, time.time() - started)
         if clip:

@@ -43,6 +43,8 @@ SYSTEM = (
     "모르는 내용을 지어내지 않는다."
 )
 
+LEAD_IN = 2.0  # 시각을 누르면 말이 시작되기 조금 전부터 나오게 (초)
+
 # 제목 말투: clean(깔끔, 기본) / friendly(친근: 방송·커뮤니티 말투)
 TONES = ("clean", "friendly")
 FRIENDLY = (
@@ -70,7 +72,7 @@ class Block:
     summary: str = ""
     activity: str = ""
 
-    def transcript(self, limit: int = 3500) -> str:
+    def transcript(self, limit: int = 4500) -> str:
         text = "\n".join(f"[{fmt_time(s.t0)}] {s.text}" for s in self.segments)
         return text[:limit] or "(말소리 없음)"
 
@@ -208,17 +210,19 @@ def refine_starts(llm: LocalLLM, blocks: list[Block], chapters: list[Chapter], s
     for n, (prev, ch) in enumerate(zip(chapters, chapters[1:]), 1):
         if step:
             step(n, len(chapters) - 1)
-        cand = [s for s in blocks[ch.block - 1].segments[-6:] + blocks[ch.block].segments]
+        # 앞 구간 끝 90초부터 이 구간까지의 문장 중에서 고른다 (주제는 5분 경계 조금 앞에서 바뀌기도 한다)
+        edge = blocks[ch.block].t0 - 90
+        cand = [s for s in blocks[ch.block - 1].segments if s.t0 >= edge] + blocks[ch.block].segments
         if not cand:
             continue
-        numbered = "\n".join(f"{k}. [{fmt_time(s.t0)}] {s.text[:150]}" for k, s in enumerate(cand))
+        numbered = "\n".join(f"{k}. [{fmt_time(s.t0)}] {s.text[:80]}" for k, s in enumerate(cand))
         user = (
             f"이전 챕터: {prev.title}\n다음 챕터: {ch.title}\n\n대본:\n{numbered}\n\n"
             "'다음 챕터' 내용이 처음 시작되는 줄 번호를 골라라."
         )
         k = llm.json(SYSTEM, user, LINE_SCHEMA, max_tokens=50)["line"]
         if 0 <= k < len(cand):
-            ch.t = max(prev.t + 60, cand[k].t0)
+            ch.t = max(prev.t + 60, cand[k].t0 - LEAD_IN)
 
 
 HL_SCHEMA = {
@@ -248,7 +252,9 @@ def title_highlights(llm: LocalLLM, segments: list[Segment], highlights: list[Hi
         title = out["title"].strip()
         # '채팅 급증'처럼 반응 이름을 그대로 베낀 제목은 내용이 없으므로 버린다
         if out["keep"] and title and title not in REACTION_LABEL.values():
-            return Entry(h.t, title, "highlight")
+            # 채팅 반응은 말이 끝난 뒤에 오르므로, 그때 하던 문장의 시작으로 당긴다
+            start = max((s.t0 for s in near if s.t0 <= h.t), default=h.t)
+            return Entry(max(0.0, start - LEAD_IN), title, "highlight")
         return None
 
     return [e for e in llm.map(one, highlights, step) if e]
