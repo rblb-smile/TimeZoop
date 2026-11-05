@@ -71,21 +71,34 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{a
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{#AppName} 실행"; Flags: nowait postinstall skipifsilent
 
-[UninstallDelete]
-Type: files; Name: "{app}\TimeZoop.old*.exe"
-
 [Code]
-// 업데이트 설치 전에 기존 실행 파일을 치운다. 꺼진 프로세스의 껍데기가 시스템에 남아 있으면 파일을 지울 수 없어
-// "DeleteFile 실패; 코드 5" 오류가 나는데, 이름 바꾸기는 그래도 되므로 지우지 못하면 이름을 바꿔 둔다.
+// 업데이트 설치 전 준비. 꺼진 프로세스의 껍데기가 시스템에 남아 있으면 실행 파일과 _internal 안의 파일들을 지울 수 없어
+// "DeleteFile 실패; 코드 5" 오류가 난다. 그래도 폴더 이름은 바꿀 수 있으므로, 실행 파일을 못 지우면
+// 설치 폴더 전체를 옆으로 치우고 빈 폴더에 새로 설치한다. 치운 폴더는 다음 설치 때 지운다.
+procedure RemoveOldFolders(const App: String);
+var
+  Found: TFindRec;
+begin
+  if FindFirst(App + '_old*', Found) then
+  try
+    repeat
+      DelTree(ExtractFilePath(App) + Found.Name, True, True, True);
+    until not FindNext(Found);
+  finally
+    FindClose(Found);
+  end;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
-  Exe: String;
+  App, Exe: String;
 begin
   Result := '';
-  DelTree(ExpandConstant('{app}\TimeZoop.old*.exe'), False, True, False);
-  Exe := ExpandConstant('{app}\{#AppExe}');
+  App := ExpandConstant('{app}');
+  RemoveOldFolders(App);
+  Exe := App + '\{#AppExe}';
   if FileExists(Exe) and not DeleteFile(Exe) then
-    RenameFile(Exe, ExpandConstant('{app}\TimeZoop.old') + GetDateTimeString('yyyymmddhhnnss', #0, #0) + '.exe');
+    RenameFile(App, App + '_old' + GetDateTimeString('yyyymmddhhnnss', #0, #0));
 end;
 
 // 제거할 때, 첫 실행에 받은 AI 모델·분석 데이터(%LOCALAPPDATA%\TimeZoop)도 지울지 묻는다.
