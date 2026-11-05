@@ -479,9 +479,8 @@ const app = {
     const order = ["fetch", "chat", "stt", "llm"];
     const idx = j.result ? 4 : order.indexOf(j.stage || "fetch");
     t.querySelectorAll(".stop").forEach((s, i) => { s.classList.toggle("done", i < idx); s.classList.toggle("active", i === idx && !j.error); });
-    // 선은 지나온 칸까지는 항상 닿고, 지금 단계가 진행된 만큼 그 칸 쪽으로 늘어난다
-    const r = Math.min(1, Math.max(0, j.ratio == null ? 0 : j.ratio));
-    $("routeFill").style.width = j.result ? "100%" : `${(Math.max(0, idx - 1 + r) / 3) * 100}%`;
+    // 선은 표시된 퍼센트만큼 늘어나되, 지나온 칸보다 짧아지지는 않게 한다
+    $("routeFill").style.width = j.result ? "100%" : `${Math.max((j.pct || 0) * 100, ((idx - 1) / 3) * 100)}%`;
     if (j.result) {
       $("trackerState").textContent = "완료";
       $("trackerTitle").textContent = "타임라인이 완성됐어요! 눌러서 확인하기";
