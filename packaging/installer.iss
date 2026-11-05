@@ -39,6 +39,8 @@ WizardResizable=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 DisableProgramGroupPage=yes
+; 타임줍이 켜져 있으면 설치 전에 끄라고 알려 준다 (notify.py의 창 하나만 실행 표시와 같은 이름)
+AppMutex=Local\TimeZoop.Single
 
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
@@ -69,7 +71,23 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; IconFilename: "{a
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{#AppName} 실행"; Flags: nowait postinstall skipifsilent
 
+[UninstallDelete]
+Type: files; Name: "{app}\TimeZoop.old*.exe"
+
 [Code]
+// 업데이트 설치 전에 기존 실행 파일을 치운다. 꺼진 프로세스의 껍데기가 시스템에 남아 있으면 파일을 지울 수 없어
+// "DeleteFile 실패; 코드 5" 오류가 나는데, 이름 바꾸기는 그래도 되므로 지우지 못하면 이름을 바꿔 둔다.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Exe: String;
+begin
+  Result := '';
+  DelTree(ExpandConstant('{app}\TimeZoop.old*.exe'), False, True, False);
+  Exe := ExpandConstant('{app}\{#AppExe}');
+  if FileExists(Exe) and not DeleteFile(Exe) then
+    RenameFile(Exe, ExpandConstant('{app}\TimeZoop.old') + GetDateTimeString('yyyymmddhhnnss', #0, #0) + '.exe');
+end;
+
 // 제거할 때, 첫 실행에 받은 AI 모델·분석 데이터(%LOCALAPPDATA%\TimeZoop)도 지울지 묻는다.
 // 설정·로그인 정보(%APPDATA%\TimeZoop)는 같이 지운다. 타임라인 텍스트 파일(문서\타임줍)은 사용자 결과물이라 남긴다.
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
